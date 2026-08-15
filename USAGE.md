@@ -99,23 +99,26 @@
 | --- | --- | --- |
 | 直接发消息 | 作为任务派发给 DSH agent（聊天特化会话则直接聊天） | `帮我看一下 /path/to/project 里的文件` |
 | `/ask <任务>` | 显式派发任务 | `/ask 检查磁盘空间并汇报` |
-| `/exec <命令>` | 在电脑上执行 shell 命令 | `/exec df -h` |
-| `/status` | 查看当前 agent 状态（轮次/步数/正在做什么） | `/status` |
-| `/progress [n]` | 回放最近 n 条进度（默认 10） | `/progress 20` |
-| `/sessions` | 列出所有会话（标题+ID+状态+序号） | `/sessions` |
-| `/session <序号\|标题\|id>` | 切换目标会话（序号/标题模糊/ID 精确） | `/session 2`、`/session ai女友` |
+| `/exec <命令>` | 在电脑上执行 shell 命令 | `/exec df -h`（缩写 `/run`） |
+| `/status` | 查看当前 agent 状态（轮次/步数/正在做什么） | `/status`（`/st`） |
+| `/progress [n]` | 回放最近 n 条进度（默认 10） | `/progress 20`（`/pg`） |
+| `/sessions` | 列出所有会话（标题+ID+状态+序号） | `/sessions`（`/ss`） |
+| `/session <序号\|标题\|id>` | 切换目标会话（序号/标题模糊/ID 精确） | `/session 2`（`/s`） |
 | `/title <名称>` | 给当前目标会话重命名（改完可用标题切换） | `/title 我的测试` |
-| `/newsession <id>` | 新建 agent 会话并切换（自动以 id 为标题） | `/newsession ai女友` |
-| `/chatbind on\|off` | 把当前目标会话绑定/解绑为**聊天特化**（发消息=直接聊天） | `/chatbind on` |
+| `/newsession <id>` | 新建 agent 会话并切换（自动以 id 为标题） | `/newsession ai女友`（`/ns`） |
+| `/chatbind on\|off` | 把当前目标会话绑定/解绑为**聊天特化**（发消息=直接聊天） | `/chatbind on`（`/cb`） |
 | `/chat on\|off` | 全局纯净聊天模式开关 | `/chat on` |
 | `/chat <名字>` | 切换到指定聊天会话（独立记忆） | `/chat ai女友` |
 | `/chat list` | 列出所有聊天会话 | `/chat list` |
 | `/chat clear` | 清空当前聊天会话的记忆 | `/chat clear` |
-| `/cancel` | 取消当前任务 | `/cancel` |
-| `/screenshot` | 截屏并作为图片发给你 | `/screenshot` |
-| `/quiet on\|off` | 开关进度自动推送 | `/quiet off` |
-| `/ping` | 连通性测试 | `/ping` |
-| `/help` | 查看命令列表 | `/help` |
+| `/cancel` | 取消当前任务 | `/cancel`（`/x`） |
+| `/screenshot` | 截屏并作为图片发给你 | `/screenshot`（`/sc`） |
+| `/quiet on\|off` | 开关进度自动推送 | `/quiet off`（`/q`） |
+| `/panel` | QQ 控制面板（图形开关/二维码） | `/panel`（`/pn`） |
+| `/ping` | 连通性测试 | `/ping`（`/pong`） |
+| `/help` | 查看命令列表 | `/help`（`/h`） |
+
+> 所有长命令都有等效缩写（原命令不变），`/help` 可查看对照表。
 
 ### 群聊
 
@@ -290,7 +293,16 @@ quit                             # 退出
 
 ---
 
-## 十二、安全提示
+## 十二、QQ 图形开关（设置页面板）
+
+DSH Web UI **设置 → QQ 远程**：实时状态（插件连接/QQ 登录）+ 「重新登录」开关 + 登录二维码自动弹出。
+完整面板：`http://127.0.0.1:3080/qq-remote/panel`（QQ 里发 `/panel` 获取链接）。
+
+登录态失效时：打开面板 → 二维码自动显示 → 手机 QQ 扫码 → 自动恢复，全程无需命令行。
+
+---
+
+## 十三、安全提示
 
 1. `allowedUsers` 务必配置，否则任何人可控电脑
 2. `/exec` 可执行任意命令——仅对白名单用户开放，必要时 `execAllowed: false`

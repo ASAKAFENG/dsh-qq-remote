@@ -108,3 +108,31 @@ node test/onebot-mock.mjs 3001
 - `allowedUsers` 务必配置为你的 QQ 号，否则任何给你机器人发消息的人都能控制电脑
 - `/exec` 可执行任意命令；`execAllowed: false` 可整体禁用
 - 建议通过 NapCat 使用小号/机器人号，避免主号被风控
+
+## 更新日志
+
+### v0.2.0（2026-08-15）
+
+**新功能**
+- 🖥️ **QQ 图形开关**：DSH 设置页新增「QQ 远程」面板（Web UI 设置 → QQ 远程）—— 实时显示插件/登录状态，一键重新登录，登录失效时**自动弹出二维码**（手机扫码即登）
+- 🎛️ **控制面板页面**：`http://127.0.0.1:3080/qq-remote/panel`（完整面板，`/panel` 命令可获取链接）
+- ⚡ **指令缩写**：长命令新增等效缩写（原命令不变）—— `/st` `/ss` `/s` `/ns` `/cb` `/pg` `/sc` `/q` `/x` `/run` `/task` `/h` `/pn`，`/help` 查看对照
+- 💬 聊天模式增强：多聊天会话（`/chat <名字>`）、记忆持久化（`~/.dsh/qq-remote-chats/`）、上下文无限制
+- 💗 聊天特化会话（`/chatbind`）：指定会话直接聊天回复，其他会话不受影响
+- 📋 会话标题化：`/sessions` 显示标题，`/session <序号|标题|id>` 切换，`/title` 重命名，`/newsession` 新建
+- 📦 一键安装脚本 `install.sh`
+
+**Bug 修复**
+- 🐛 聊天模式第二轮崩溃（`reading 'kind'`）：消息缺少 `source` 字段导致 LLM 管道报错
+- 🐛 `/newsession` 创建的会话随插件重载消失：改为根上下文创建，生命周期独立
+- 🐛 重启后 QQ 连接不自动恢复：看门狗增加 CONNECTING 卡死判定（15 秒未连接强制重建）
+- 🐛 语音/图片消息无响应：改为友好提示"请用文字发送"
+- 🐛 会话标题显示 `[object Object]`：正确读取标题对象
+- 🐛 设置页空白（`locale.t is not a function`）：改用新版 locale API（`ctx.locale.bind`）
+
+**平台**
+- Linux 完整支持；macOS/Windows 核心功能可用（详见"环境要求"）
+
+### v0.1.0（2026-08-15）
+
+- 首个开源版本：OneBot 11 桥接、`/exec`、`/ask`、阶段进度汇报、截图回传、`qq_report`/`qq_screenshot` 工具、零 npm 依赖

@@ -4,3 +4,4 @@ lib/
 *.tgz
 test/node_modules/
 test/out/
+dsh-plugin-session-delete/

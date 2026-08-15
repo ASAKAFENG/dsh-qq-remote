@@ -336,6 +336,8 @@ export function apply(ctx, config) {
   let disposed = false;
   /** 看门狗：周期性检查连接，未连接则重连（不依赖 close 事件）。 */
   let watchdogTimer = null;
+  /** 最近一次 WebSocket 创建时间（用于判定 CONNECTING 卡死）。 */
+  let wsCreatedAt = 0;
 
   // ── OneBot 连接 ────────────────────────────────────────────────
   function connect() {
@@ -534,7 +536,7 @@ export function apply(ctx, config) {
       return;
     }
     // 纯净聊天模式：仅允许聊天相关与基础命令
-    if (chatMode && !["chat", "help", "ping", "status"].includes(cmd)) {
+    if (chatMode && !["chat", "help", "h", "ping", "status", "st"].includes(cmd)) {
       await reply("💬 纯净聊天模式中，只聊天哦（可用 /chat /help /ping /status，/chat off 退出模式）");
       return;
     }
@@ -543,21 +545,31 @@ export function apply(ctx, config) {
         await doChatMode(arg);
         break;
       case "chatbind":
+      case "cb":
         await doChatBind(arg);
         break;
+      case "panel":
+      case "pn":
+        await reply(`🖥️ QQ 控制面板：http://127.0.0.1:3080/qq-remote/panel\n（浏览器打开，登录失效时可一键重登并显示二维码）`);
+        break;
       case "help":
+      case "h":
         await reply(helpText());
         break;
       case "ping":
+      case "pong":
         await reply("🏓 pong（OneBot 连接正常）");
         break;
       case "status":
+      case "st":
         await reply(statusText());
         break;
       case "sessions":
+      case "ss":
         await reply(sessionsText());
         break;
       case "session":
+      case "s":
         if (!arg) {
           await reply(sessionUsage());
           return;
@@ -574,6 +586,7 @@ export function apply(ctx, config) {
         break;
       case "newsession":
       case "new-session":
+      case "ns":
         if (!arg) {
           await reply("用法: /newsession <sessionId>（在当前工作区新建 agent 会话并切换）");
           return;
@@ -581,6 +594,7 @@ export function apply(ctx, config) {
         await doNewSession(arg);
         break;
       case "ask":
+      case "task":
         if (!arg) {
           await reply("用法: /ask <任务描述>");
           return;
@@ -588,9 +602,11 @@ export function apply(ctx, config) {
         await doAsk(arg);
         break;
       case "cancel":
+      case "x":
         await doCancel();
         break;
       case "exec":
+      case "run":
         if (!config.execAllowed) {
           await reply("⛔ /exec 已被配置禁用（execAllowed=false）");
           return;
@@ -601,15 +617,18 @@ export function apply(ctx, config) {
         }
         await doExec(arg);
         break;
-      case "progress": {
+      case "progress":
+      case "pg": {
         const n = parseInt(arg, 10) || 10;
         await reply(progressText(n));
         break;
       }
       case "screenshot":
+      case "sc":
         await doScreenshot();
         break;
       case "quiet":
+      case "q":
         if (arg === "on" || arg === "1") config.autoReport = true;
         else if (arg === "off" || arg === "0") config.autoReport = false;
         await reply(`进度自动汇报: ${config.autoReport ? "开 ✅" : "关 ⏸️"}`);
@@ -622,22 +641,22 @@ export function apply(ctx, config) {
   function helpText() {
     return [
       "🤖 DSH QQ 远程控制",
-      "/ask <任务>   派发任务给 DSH agent（私聊直接发消息也可）",
-      "/exec <命令>  在电脑上执行 shell 命令",
-      "/status       查看 agent 状态",
-      "/progress [n] 查看最近进度（默认 10 条）",
-      "/screenshot   截图并发送给你",
-      "/cancel       取消当前任务",
-      "/sessions     列出会话（含标题）",
-      "/session <标题|id> 切换目标会话（支持标题匹配）",
+      "/ask <任务>   派发任务（私聊直接发消息也可）      /task",
+      "/exec <命令>  在电脑上执行 shell 命令              /run",
+      "/status       查看 agent 状态                     /st",
+      "/progress [n] 查看最近进度（默认 10 条）          /pg",
+      "/screenshot   截图并发送给你                      /sc",
+      "/cancel       取消当前任务                        /x",
+      "/sessions     列出会话（含标题）                  /ss",
+      "/session <标题|id> 切换目标会话                  /s",
       "/title <名称>  给当前目标会话重命名",
-      "/newsession <id> 新建会话并切换",
-      "/quiet on|off 开关进度自动推送",
-      "/quiet on|off 开关进度自动推送",
-      "/chat on|off  纯净聊天模式（/chat <名字> 切换聊天会话）",
-      "/chatbind on|off 把当前目标会话绑定为聊天特化（发消息=直接聊天）",
-      "/ping         连通性测试",
-      "/help         本帮助",
+      "/newsession <id> 新建会话并切换                  /ns",
+      "/quiet on|off 开关进度自动推送                    /q",
+      "/chat on|off  纯净聊天模式（/chat <名字> 切换）",
+      "/chatbind on|off 绑定聊天特化会话                 /cb",
+      "/panel        打开 QQ 控制面板                    /pn",
+      "/ping         连通性测试（/pong 亦可）",
+      "/help         本帮助（/h 亦可）",
     ].join("\n");
   }
 
@@ -1373,9 +1392,154 @@ export function apply(ctx, config) {
     })));
   }
 
+  // ── QQ 图形开关面板（Web 页面：状态 + 重新登录 + 二维码） ──────
+  const QR_PATHS = [
+    path.join(os.homedir(), "qqnt", "resources", "app", "napcat", "cache", "qrcode.png"),
+  ];
+
+  function findQrcode() {
+    for (const p of QR_PATHS) {
+      try {
+        if (fs.existsSync(p) && Date.now() - fs.statSync(p).mtimeMs < 10 * 60 * 1000) return p;
+      } catch {}
+    }
+    return null;
+  }
+
+  async function qqLoggedIn() {
+    try {
+      const info = await api("get_login_info", {}, 5000);
+      return Boolean(info?.user_id);
+    } catch {
+      return false;
+    }
+  }
+
+  function json(res, data) {
+    res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+    res.end(JSON.stringify(data));
+  }
+
+  function panelHtml() {
+    return `<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QQ 远程控制 · DSH</title>
+<style>
+  body{background:#0f1420;color:#e8eaf0;font-family:system-ui,-apple-system,sans-serif;margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center}
+  .card{background:#171e2e;border:1px solid #26304a;border-radius:16px;padding:32px 36px;width:min(420px,92vw);box-shadow:0 12px 40px rgba(0,0,0,.4)}
+  h1{font-size:20px;margin:0 0 4px;display:flex;align-items:center;gap:8px}
+  .sub{color:#8b93a7;font-size:13px;margin-bottom:20px}
+  .row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #222c44;font-size:14px}
+  .row:last-of-type{border-bottom:none}
+  .badge{padding:3px 10px;border-radius:999px;font-size:12px;font-weight:600}
+  .ok{background:#12331f;color:#4ade80}.bad{background:#3a1620;color:#f87171}.wait{background:#332b12;color:#facc15}
+  button{width:100%;margin-top:18px;padding:12px;border:none;border-radius:10px;background:#4d6bfe;color:#fff;font-size:15px;font-weight:600;cursor:pointer}
+  button:hover{background:#5b77ff}button:disabled{background:#2a3350;color:#6b7280;cursor:not-allowed}
+  button.danger{background:#b91c1c}button.danger:hover{background:#dc2626}
+  #qrwrap{display:none;margin-top:18px;text-align:center}
+  #qrwrap img{width:240px;height:240px;border-radius:12px;background:#fff;padding:10px}
+  #qrhint{color:#8b93a7;font-size:12px;margin-top:8px}
+  #log{color:#64748b;font-size:12px;margin-top:14px;min-height:16px}
+</style></head><body>
+<div class="card">
+  <h1>🤖 QQ 远程控制</h1>
+  <div class="sub">dsh-qq-remote 控制面板</div>
+  <div class="row"><span>插件连接</span><span id="st-ws" class="badge wait">检测中…</span></div>
+  <div class="row"><span>QQ 登录状态</span><span id="st-qq" class="badge wait">检测中…</span></div>
+  <button id="btn" disabled>检测中…</button>
+  <div id="qrwrap"><img id="qr" alt="登录二维码"><div id="qrhint"></div></div>
+  <div id="log"></div>
+</div>
+<script>
+const $=id=>document.getElementById(id);
+let polling=false, qrTimer=null;
+async function refresh(){
+  try{
+    const r=await fetch('/qq-remote/status');const s=await r.json();
+    $('st-ws').textContent=s.wsConnected?'已连接':'未连接';
+    $('st-ws').className='badge '+(s.wsConnected?'ok':'bad');
+    $('st-qq').textContent=s.loggedIn?'已登录':'未登录';
+    $('st-qq').className='badge '+(s.loggedIn?'ok':'bad');
+    const b=$('btn');
+    b.disabled=false;
+    if(s.loggedIn){b.textContent='✅ QQ 已登录（需要重登点这里）';b.className='';}
+    else if(s.qrAvailable){b.textContent='🔄 重新登录（二维码已就绪）';b.className='danger';}
+    else{b.textContent='🔄 重新登录（弹出二维码）';b.className='danger';}
+    if(polling&&s.qrAvailable)showQr();
+    if(polling&&s.loggedIn){stopPoll();log('✅ 登录成功');}
+    if(!s.loggedIn&&s.qrAvailable)showQr();
+  }catch(e){log('状态获取失败: '+e.message);}
+}
+function showQr(){
+  $('qrwrap').style.display='block';
+  $('qr').src='/qq-remote/qrcode?t='+Date.now();
+  $('qrhint').textContent='手机 QQ 扫码授权（二维码约 2 分钟有效，过期自动刷新）';
+}
+function stopPoll(){polling=false;clearInterval(qrTimer);}
+$('btn').onclick=async()=>{
+  const b=$('btn');b.disabled=true;b.textContent='正在重启 NapCat…';
+  log('触发重新登录…');
+  try{await fetch('/qq-remote/relogin',{method:'POST'});}catch(e){}
+  log('等待二维码/自动登录…（NapCat 重启中，约 30-60 秒）');
+  $('qrwrap').style.display='none';
+  polling=true;qrTimer=setInterval(refresh,3000);
+};
+refresh();setInterval(refresh,5000);
+</script></body></html>`;
+  }
+
+  function registerQqPanel() {
+    const webServer = ctx.get("webServer");
+    if (!webServer) return;
+    ctx.effect(() => webServer.register({
+      kind: "exact", path: "/qq-remote/panel",
+      handler: async (_req, res) => {
+        res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+        res.end(panelHtml());
+      },
+    }), "qq-remote: panel");
+    ctx.effect(() => webServer.register({
+      kind: "exact", path: "/qq-remote/status",
+      handler: async (_req, res) => {
+        const [loggedIn, qr] = await Promise.all([
+          qqLoggedIn().catch(() => false),
+          Promise.resolve(findQrcode()),
+        ]);
+        json(res, {
+          loggedIn,
+          wsConnected: Boolean(ws && ws.readyState === WebSocket.OPEN),
+          qrAvailable: Boolean(qr),
+        });
+      },
+    }), "qq-remote: status");
+    ctx.effect(() => webServer.register({
+      kind: "exact", path: "/qq-remote/relogin",
+      handler: async (_req, res) => {
+        json(res, { ok: true });
+        // 后台重启 NapCat：登录态有效则快速登录自动恢复，失效则自动进入二维码模式
+        runProcess("systemctl", ["--user", "restart", "napcat-qq"], { timeout: 15000 }).catch(() => {});
+      },
+    }), "qq-remote: relogin");
+    ctx.effect(() => webServer.register({
+      kind: "exact", path: "/qq-remote/qrcode",
+      handler: async (_req, res) => {
+        const p = findQrcode();
+        if (!p) {
+          res.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
+          res.end("no qrcode yet");
+          return;
+        }
+        res.writeHead(200, { "content-type": "image/png", "cache-control": "no-store" });
+        res.end(fs.readFileSync(p));
+      },
+    }), "qq-remote: qrcode");
+  }
+
   // ── 装配 ──────────────────────────────────────────────────────
   ctx.effect(() => {
     registerTools();
+    registerQqPanel();
     const offEvent = ctx.on("session/event", onSessionEvent);
     connect();
     startWatchdog();

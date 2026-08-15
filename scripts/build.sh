@@ -6,10 +6,12 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-echo "=== Assembling lib/ (index.js → lib/index.js) ==="
+echo "=== Assembling lib/ (index.js + client.js → lib/) ==="
 mkdir -p lib
 cp index.js lib/index.js
+cp client.js lib/client.js 2>/dev/null || true
 node --check lib/index.js
+if [ -f lib/client.js ]; then node --check lib/client.js; fi
 
 # 定位 DSH 运行时 node_modules（npx 缓存）：显式 DSH_APP_NODE_MODULES > 含 dsh-tools 的最新 npx 缓存
 APP_NM="${DSH_APP_NODE_MODULES:-}"
