@@ -21,6 +21,27 @@
 | QQ 图形开关 | `/panel` + 设置页「QQ 远程」 | 实时状态、一键重新登录、登录失效自动弹出二维码扫码恢复 |
 | 一键安装 | `install.sh` | 自动构建 + npm 依赖 + 装配注册，跨平台自包含 |
 
+## 命令一览
+
+```
+/help         查看全部命令（含缩写对照）        /h
+/ping         连通性测试                        /pong
+/status       查看 agent 状态                   /st
+/sessions     列出会话（标题+ID+状态）          /ss
+/session <序号|标题|id>  切换目标会话           /s
+/title <名称> 给当前目标会话重命名              /rename
+/newsession <id> 新建会话并切换                 /ns
+/ask <任务>   派发任务（私聊直接发消息也行）     /task
+/cancel       取消当前任务                      /x
+/exec <命令>  在电脑上执行 shell 命令           /run
+/progress [n] 查看最近进度                      /pg
+/screenshot   截图并发送给你                    /sc
+/quiet on|off 开关进度自动推送                  /q
+/chat on|off  纯净聊天模式                      （/chat <名字> 切换会话）
+/chatbind on|off 聊天特化会话（直接聊天）       /cb
+/panel        打开 QQ 控制面板                  /pn
+```
+
 ## 环境要求
 
 | 项目 | 要求 |
@@ -78,26 +99,6 @@ bash install.sh
 
 完整配置项见 `USAGE.md`（含 `reportMode`/`phaseIntervalMs`/`chatSessionNames` 等全部字段）。
 
-## 命令一览
-
-```
-/help         查看全部命令（含缩写对照）        /h
-/ping         连通性测试                        /pong
-/status       查看 agent 状态                   /st
-/sessions     列出会话（标题+ID+状态）          /ss
-/session <序号|标题|id>  切换目标会话           /s
-/title <名称> 给当前目标会话重命名              /rename
-/newsession <id> 新建会话并切换                 /ns
-/ask <任务>   派发任务（私聊直接发消息也行）     /task
-/cancel       取消当前任务                      /x
-/exec <命令>  在电脑上执行 shell 命令           /run
-/progress [n] 查看最近进度                      /pg
-/screenshot   截图并发送给你                    /sc
-/quiet on|off 开关进度自动推送                  /q
-/chat on|off  纯净聊天模式                      （/chat <名字> 切换会话）
-/chatbind on|off 聊天特化会话（直接聊天）       /cb
-/panel        打开 QQ 控制面板                  /pn
-```
 
 ## 截图原理
 
