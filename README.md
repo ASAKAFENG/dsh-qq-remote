@@ -14,7 +14,7 @@
 | 会话管理 | `/sessions` `/session <序号\|标题\|id>` `/title` | 标题化会话列表、按序号/标题/ID 切换、重命名 |
 | 新建会话 | `/newsession <id>` | 在当前工作区新建 agent 会话并切换（生命周期挂 DSH 根进程） |
 | AI 聊天 | `/chat on\|off` `/chat <名字>` | 纯净聊天模式：直连模型像人一样回复，多聊天会话、记忆持久化 |
-| AI 女友形态 | `/chatbind on\|off` | 把指定 DSH 会话绑定为聊天特化：发消息=直接聊天，其他会话不受影响 |
+| 聊天特化会话 | `/chatbind on\|off` | 把指定 DSH 会话绑定为聊天特化：发消息=直接聊天（角色可自定义），其他会话不受影响 |
 | 取消任务 | `/cancel` | 中止 agent 当前工作 |
 | 截图回传 | `/screenshot` | 截屏（xdg-desktop-portal / grim / scrot…）并以图片消息发送 |
 | Agent 主动汇报 | `qq_report` `qq_screenshot` | agent 在会话里可主动向 QQ 发送文本 / 截图 |
