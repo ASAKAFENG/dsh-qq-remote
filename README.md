@@ -38,7 +38,7 @@
 ### 一键安装（推荐，开源用户）
 
 ```bash
-git clone https://github.com/<your-name>/dsh-qq-remote
+git clone https://github.com/ASAKAFENG/dsh-qq-remote
 cd dsh-qq-remote
 bash install.sh
 ```

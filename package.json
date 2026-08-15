@@ -25,12 +25,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/<your-name>/dsh-qq-remote.git"
+    "url": "git+https://github.com/ASAKAFENG/dsh-qq-remote.git"
   },
   "bugs": {
-    "url": "https://github.com/<your-name>/dsh-qq-remote/issues"
+    "url": "https://github.com/ASAKAFENG/dsh-qq-remote/issues"
   },
-  "homepage": "https://github.com/<your-name>/dsh-qq-remote#readme",
+  "homepage": "https://github.com/ASAKAFENG/dsh-qq-remote#readme",
   "keywords": [
     "dsh",
     "dsh-plugin",
