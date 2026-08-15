@@ -41,5 +41,9 @@
     "remote-control",
     "chatbot"
   ],
-  "author": "dsh-qq-remote contributors"
+  "author": "dsh-qq-remote contributors",
+  "dsh": {
+    "plugin": true,
+    "kind": "server"
+  }
 }
