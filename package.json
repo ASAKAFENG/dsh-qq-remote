@@ -7,6 +7,7 @@
   "files": [
     "lib",
     "client.js",
+    "install.sh",
     "README.md",
     "USAGE.md",
     "LICENSE"
