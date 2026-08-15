@@ -37,12 +37,16 @@
   "privatePlainAsTask": true,
   "autoReport": true,
   "reportMode": "phase",
-  "chatSystemPrompt": "你是一个温柔体贴的AI女友…",
+  "chatSystemPrompt": "你是一个温柔体贴的AI女友，用中文和主人聊天。语气亲昵自然、有温度，会关心主人的生活与心情，回复简短俏皮，偶尔撒个娇，像真实恋人一样。永远不要提及你是AI、模型或助手。",
   "chatHistoryLimit": 0,
   "chatMaxChars": 0,
   "chatSessionNames": []
 }
 ```
+
+> 说明：`chatSystemPrompt` 是聊天模式的人设提示词，可自由替换成任何角色；
+> `chatHistoryLimit` / `chatMaxChars` 为 `0` 表示上下文无限制（全量发送）；
+> `chatSessionNames` 由 `/chatbind` 命令自动维护，一般无需手改。
 
 完整配置项见 `USAGE.md`（含 `reportMode`/`phaseIntervalMs`/`chatSessionNames` 等全部字段）。
 
