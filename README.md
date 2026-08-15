@@ -35,6 +35,18 @@
 
 ## 安装与配置
 
+### 一键安装（推荐，开源用户）
+
+```bash
+git clone https://github.com/<your-name>/dsh-qq-remote
+cd dsh-qq-remote
+bash install.sh
+```
+
+自动完成：构建 → 安装到 DSH profile → 注册 loader 条目 → 生成配置模板（`~/.dsh/qq-remote.json`），重启 DSH 生效。
+
+### 手动安装
+
 1. 构建：`bash scripts/build.sh`（纯 JS，无编译依赖）
 2. 注入：DSH 侧 `dev_inject_plugin`（或 loader 装配），插件名 `@dsh-external/dsh-qq-remote`
 3. 运行任一 OneBot 11 实现（如 NapCat），开启**反向 WebSocket**（默认 `ws://127.0.0.1:3001/ws`），
