@@ -73,6 +73,8 @@ export const Config = z.object({
   chatMaxChars: z.number().default(0),
   /** 聊天特化会话名单（标题或 id）：这些会话的私聊消息直接进入聊天回复，不走任务。 */
   chatSessionNames: z.array(z.string()).default([]),
+  /** NapCat 登录二维码文件路径（留空自动探测常见安装位置）。 */
+  qrcodePath: z.string().default(""),
 });
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -1393,12 +1395,21 @@ export function apply(ctx, config) {
   }
 
   // ── QQ 图形开关面板（Web 页面：状态 + 重新登录 + 二维码） ──────
-  const QR_PATHS = [
-    path.join(os.homedir(), "qqnt", "resources", "app", "napcat", "cache", "qrcode.png"),
-  ];
+  /** 登录二维码候选路径（自动探测常见 NapCat 安装位置；可用 qrcodePath 配置覆盖）。 */
+  const QR_CANDIDATES = () => {
+    const home = os.homedir();
+    const list = [
+      path.join(home, "napcat", "cache", "qrcode.png"),
+      "/opt/QQ/resources/app/napcat/cache/qrcode.png",
+      "/opt/QQNT/resources/app/napcat/cache/qrcode.png",
+      path.join(home, ".config", "QQ", "NapCat", "cache", "qrcode.png"),
+    ];
+    if (config.qrcodePath) list.unshift(config.qrcodePath);
+    return list;
+  };
 
   function findQrcode() {
-    for (const p of QR_PATHS) {
+    for (const p of QR_CANDIDATES()) {
       try {
         if (fs.existsSync(p) && Date.now() - fs.statSync(p).mtimeMs < 10 * 60 * 1000) return p;
       } catch {}
