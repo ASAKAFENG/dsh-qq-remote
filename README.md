@@ -19,6 +19,20 @@
 | 截图回传 | `/screenshot` | 截屏（xdg-desktop-portal / grim / scrot…）并以图片消息发送 |
 | Agent 主动汇报 | `qq_report` `qq_screenshot` | agent 在会话里可主动向 QQ 发送文本 / 截图 |
 
+## 环境要求
+
+| 项目 | 要求 |
+| --- | --- |
+| Node.js | ≥ 22（使用内置 WebSocket / fetch，零 npm 依赖） |
+| 宿主 | DeepSeek Harness（DSH）环境，提供 `@deepseek-ai/*` peer 依赖 |
+| QQ 桥 | 任一 OneBot 11 实现（NapCat / Lagrange.OneBot / go-cqhttp / LLOneBot） |
+| 平台 | Linux 完整支持；macOS / Windows 核心功能可用（见下） |
+
+**平台支持情况：**
+- ✅ **全平台通用**：QQ 消息桥接、任务派发、阶段汇报、AI 聊天、会话管理、Agent 工具
+- ⚠️ **Linux 最佳**：`/exec` 使用 bash；截图自动走 xdg-desktop-portal / grim / scrot 等
+- ⚠️ **macOS / Windows**：`/exec` 需环境提供 bash（如 WSL / Git Bash）；截图需在 `screenshotCommand` 配置本平台工具（如 macOS `screencapture -x <path>`），否则 `/screenshot` 不可用
+
 ## 安装与配置
 
 1. 构建：`bash scripts/build.sh`（纯 JS，无编译依赖）

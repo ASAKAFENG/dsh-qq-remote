@@ -9,6 +9,21 @@
 
 ---
 
+## 〇、环境要求与平台支持
+
+| 项目 | 要求 |
+| --- | --- |
+| Node.js | ≥ 22（内置 WebSocket / fetch，零 npm 依赖） |
+| 宿主 | DeepSeek Harness（DSH），提供 `@deepseek-ai/*` peer 依赖 |
+| QQ 桥 | 任一 OneBot 11 实现（NapCat / Lagrange.OneBot / go-cqhttp / LLOneBot） |
+| 平台 | Linux 完整支持；macOS / Windows 核心功能可用 |
+
+- ✅ **全平台通用**：QQ 消息桥接、任务派发、阶段汇报、AI 聊天、会话管理、Agent 工具
+- ⚠️ **Linux 最佳**：`/exec` 使用 bash；截图自动走 xdg-desktop-portal / grim / scrot 等
+- ⚠️ **macOS / Windows**：`/exec` 需环境提供 bash（如 WSL / Git Bash）；截图需在 `screenshotCommand` 配置本平台工具（如 macOS `screencapture -x <path>`）
+
+---
+
 ## 一、整体架构
 
 ```
