@@ -29,9 +29,9 @@ echo "[2/5] 安装运行时依赖（npm）…"
 if [ "${SKIP_DEPS:-0}" = "1" ] || [ -d "$ROOT/node_modules/@deepseek-ai" ]; then
   echo "      已存在或已跳过"
 elif (cd "$ROOT" && npm install --no-audit --no-fund --no-save \
-    "@deepseek-ai/dsh-tools@>=0.0.1-rc <2" \
-    "@deepseek-ai/dsh-llm@>=0.0.1-rc <2" \
-    "@deepseek-ai/schemastery@>=0.0.1-rc <2"); then
+    "@deepseek-ai/dsh-tools@0.1.0-rc.6" \
+    "@deepseek-ai/dsh-llm@0.1.0-rc.6" \
+    "@deepseek-ai/schemastery@3.18.1"); then
   echo "      依赖安装完成"
 else
   echo "警告: npm 依赖安装失败（可重试或 SKIP_DEPS=1 跳过，宿主 DSH 提供 peer 依赖）" >&2
