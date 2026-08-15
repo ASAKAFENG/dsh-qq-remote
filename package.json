@@ -1,0 +1,45 @@
+{
+  "name": "@dsh-external/dsh-qq-remote",
+  "version": "0.1.0",
+  "description": "通过 QQ 消息远程控制 DeepSeek Harness：命令执行(/exec)、任务派发(/ask)、阶段进度汇报、屏幕截图发送(/screenshot)、AI 聊天(/chat)与聊天特化会话(/chatbind)、会话标题化管理(/newsession /title /session)。OneBot 11(NapCat/Lagrange/go-cqhttp)，零 npm 依赖。",
+  "type": "module",
+  "main": "./lib/index.js",
+  "files": [
+    "lib",
+    "README.md",
+    "USAGE.md",
+    "LICENSE"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=22"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/dsh-llm": ">=0.0.1-rc <2",
+    "@deepseek-ai/dsh-tools": ">=0.0.1-rc <2",
+    "@deepseek-ai/schemastery": ">=0.0.1-rc <2"
+  },
+  "scripts": {
+    "build": "bash scripts/build.sh",
+    "test:mock": "node test/onebot-mock.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/<your-name>/dsh-qq-remote.git"
+  },
+  "bugs": {
+    "url": "https://github.com/<your-name>/dsh-qq-remote/issues"
+  },
+  "homepage": "https://github.com/<your-name>/dsh-qq-remote#readme",
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "qq",
+    "onebot",
+    "napcat",
+    "remote-control",
+    "chatbot"
+  ],
+  "author": "dsh-qq-remote contributors"
+}
