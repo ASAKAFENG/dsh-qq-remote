@@ -63,14 +63,14 @@ bash install.sh
   "privatePlainAsTask": true,
   "autoReport": true,
   "reportMode": "phase",
-  "chatSystemPrompt": "你是一个温柔体贴的AI女友，用中文和主人聊天。语气亲昵自然、有温度，会关心主人的生活与心情，回复简短俏皮，偶尔撒个娇，像真实恋人一样。永远不要提及你是AI、模型或助手。",
+  "chatSystemPrompt": "你是用户通过 QQ 联系的一位聊天伙伴。回复要像真人 QQ 聊天一样：简短自然、口语化、有来有回，不要使用列表/表格/标题等正式格式，不要提及你是 AI、模型或助手。",
   "chatHistoryLimit": 0,
   "chatMaxChars": 0,
   "chatSessionNames": []
 }
 ```
 
-> 说明：`chatSystemPrompt` 是聊天模式的人设提示词，可自由替换成任何角色；
+> 说明：`chatSystemPrompt` 是聊天模式的人设提示词，默认只约束"像真人聊天"的回复格式，**可自由替换成任何角色**（如 AI 女友、助理、猫娘…）；
 > `chatHistoryLimit` / `chatMaxChars` 为 `0` 表示上下文无限制（全量发送）；
 > `chatSessionNames` 由 `/chatbind` 命令自动维护，一般无需手改。
 

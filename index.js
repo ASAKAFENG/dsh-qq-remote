@@ -66,7 +66,7 @@ export const Config = z.object({
   /** 单条 QQ 消息最大长度（字符），超出截断。 */
   maxMessageLen: z.number().default(3500),
   /** 纯净聊天模式的人设提示词。 */
-  chatSystemPrompt: z.string().default("你是一个友好的 AI 伙伴，像真人一样自然地用中文聊天，回复简洁、自然、有温度，不要提你是模型或助手。"),
+  chatSystemPrompt: z.string().default("你是用户通过 QQ 联系的一位聊天伙伴。回复要像真人 QQ 聊天一样：简短自然、口语化、有来有回，不要使用列表/表格/标题等正式格式，不要提及你是 AI、模型或助手。"),
   /** 聊天模式保留的历史消息条数上限（0 = 无限制，全量发送）。 */
   chatHistoryLimit: z.number().default(0),
   /** 聊天历史总字符预算（0 = 无限制）。 */

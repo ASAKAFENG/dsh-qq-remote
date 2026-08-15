@@ -155,7 +155,7 @@ DSH 会为每个会话**自动生成默认标题**（LLM 从首条消息提炼�
 - 直连 DSH 默认模型，回复自然口语化（人设见 `chatSystemPrompt` 配置）
 - `/chat off` 退出；`/chat <名字>` 切换聊天会话（每个会话一份独立记忆）
 
-### 2. 聊天特化会话 `/chatbind`（推荐 · AI 女友形态）
+### 2. 聊天特化会话 `/chatbind`（推荐）
 
 把**某个 DSH 会话**绑定为聊天特化：切到该会话后，发消息 = 直接聊天回复（真实 QQ 对话感），其他会话完全不受影响。
 
@@ -228,7 +228,7 @@ DSH agent 在会话中还可以主动调用这两个工具：
 | `screenshotCommand` | `""` | 自定义截图命令（如 `"grim /tmp/x.png"`） |
 | `reconnectDelayMs` | `5000` | 断线重连间隔 |
 | `maxMessageLen` | `3500` | 单条消息长度上限 |
-| `chatSystemPrompt` | 通用友好人设 | 聊天模式人设提示词（现在配置的是 AI 女友人设） |
+| `chatSystemPrompt` | 中性聊天格式预设 | 聊天模式人设提示词（默认只约束"像真人 QQ 聊天"，可自定义任意角色） |
 | `chatHistoryLimit` | `0` | 聊天历史条数上限（0 = 无限制全量） |
 | `chatMaxChars` | `0` | 聊天历史字符预算（0 = 无限制） |
 | `chatSessionNames` | `[]` | 聊天特化会话名单（标题或 id；`/chatbind` 自动维护） |
