@@ -18,6 +18,8 @@
 | 取消任务 | `/cancel` | 中止 agent 当前工作 |
 | 截图回传 | `/screenshot` | 截屏（xdg-desktop-portal / grim / scrot…）并以图片消息发送 |
 | Agent 主动汇报 | `qq_report` `qq_screenshot` | agent 在会话里可主动向 QQ 发送文本 / 截图 |
+| QQ 图形开关 | `/panel` + 设置页「QQ 远程」 | 实时状态、一键重新登录、登录失效自动弹出二维码扫码恢复 |
+| 一键安装 | `install.sh` | 自动构建 + npm 依赖 + 装配注册，跨平台自包含 |
 
 ## 环境要求
 
