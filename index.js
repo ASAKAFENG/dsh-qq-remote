@@ -75,6 +75,8 @@ export const Config = z.object({
   chatSessionNames: z.array(z.string()).default([]),
   /** NapCat 登录二维码文件路径（留空自动探测常见安装位置）。 */
   qrcodePath: z.string().default(""),
+  /** NapCat 的 systemd 用户服务名（面板"重新登录"用它重启）。 */
+  napcatServiceName: z.string().default("napcat-qq"),
 });
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -1529,7 +1531,8 @@ refresh();setInterval(refresh,5000);
       handler: async (_req, res) => {
         json(res, { ok: true });
         // 后台重启 NapCat：登录态有效则快速登录自动恢复，失效则自动进入二维码模式
-        runProcess("systemctl", ["--user", "restart", "napcat-qq"], { timeout: 15000 }).catch(() => {});
+        const svc = config.napcatServiceName || "napcat-qq";
+        runProcess("systemctl", ["--user", "restart", svc], { timeout: 15000 }).catch(() => {});
       },
     }), "qq-remote: relogin");
     ctx.effect(() => webServer.register({
