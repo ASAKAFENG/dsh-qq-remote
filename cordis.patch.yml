@@ -1,0 +1,5 @@
+# dsh-qq-remote 自装配 patch（dsh plugin 安装 / include.refresh 时生效）
+- insert:
+    - id: dsh-qq-remote
+      name: '@dsh-external/dsh-qq-remote'
+      config: {}

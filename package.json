@@ -7,7 +7,9 @@
   "files": [
     "lib",
     "client.js",
+    "cordis.patch.yml",
     "install.sh",
+    "uninstall.sh",
     "README.md",
     "USAGE.md",
     "LICENSE"
@@ -49,11 +51,14 @@
     "kind": "server",
     "client": {
       "platform": "web"
+    },
+    "bundle": {
+      "patch": "./cordis.patch.yml"
     }
   },
   "exports": {
     ".": "./lib/index.js",
-    "./client": "./client.js",
+    "./client": "./lib/client.js",
     "./package.json": "./package.json"
   }
 }
