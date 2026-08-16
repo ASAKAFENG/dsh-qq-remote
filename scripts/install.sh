@@ -5,7 +5,7 @@
 # 环境: DSH_PROFILE 指定 profile（默认 web）；SKIP_DEPS=1 跳过依赖安装
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "$0")" && pwd)"
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PROFILE="${DSH_PROFILE:-web}"
 PROFILE_DIR="${HOME}/.dsh/profiles/${PROFILE}"
 PKG_NAME='@dsh-external/dsh-qq-remote'
@@ -71,7 +71,7 @@ if [ -d "$ROOT/node_modules" ]; then
 fi
 cp "$ROOT/package.json" "$DEST/package.json"
 cp "$ROOT/cordis.patch.yml" "$DEST/cordis.patch.yml"
-if [ -f "$ROOT/repair.sh" ]; then cp "$ROOT/repair.sh" "$DEST/repair.sh"; fi
+if [ -f "$ROOT/scripts/repair.sh" ]; then cp "$ROOT/scripts/repair.sh" "$DEST/repair.sh"; fi
 test -f "$DEST/lib/client.js" || { echo "错误: 安装后 lib/client.js 不存在" >&2; exit 1; }
 
 # 4. YAML-aware 注册 loader 条目（处理顶层 [] 模板、scoped 引号、原子替换 + 幂等）
@@ -183,8 +183,8 @@ echo "• 需要 OneBot 11 服务端（NapCat 等）监听 ws://127.0.0.1:3001/w
 echo
 echo "── 当前 profile 插件条目检查 ──"
 if command -v python3 >/dev/null 2>&1; then
-  if [ -f "$ROOT/repair.sh" ]; then
-    bash "$ROOT/repair.sh" "$PROFILE" | tail -n +2 | head -20
+  if [ -f "$ROOT/scripts/repair.sh" ]; then
+    bash "$ROOT/scripts/repair.sh" "$PROFILE" | tail -n +2 | head -20
   else
     echo "（提示：安装目录下的 repair.sh 可诊断 patch 结构完整性）"
   fi

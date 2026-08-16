@@ -22,7 +22,7 @@
 | 截图回传 | `/screenshot` | 截屏（xdg-desktop-portal / grim / scrot…）并以图片消息发送 |
 | Agent 主动汇报 | `qq_report` `qq_screenshot` | agent 在会话里可主动向 QQ 发送文本 / 截图 |
 | QQ 图形开关 | `/panel` + 设置页「QQ 远程」 | 实时状态、一键重新登录、登录失效自动弹出二维码扫码恢复 |
-| 一键安装 | `install.sh` | 自动构建 + npm 依赖 + 装配注册，跨平台自包含 |
+| 一键安装 | `scripts/install.sh` | 自动构建 + npm 依赖 + 装配注册，跨平台自包含 |
 
 ## 命令一览
 
@@ -66,7 +66,7 @@
 ```bash
 git clone https://github.com/ASAKAFENG/dsh-qq-remote
 cd dsh-qq-remote
-bash install.sh
+bash scripts/install.sh
 ```
 
 自动完成：构建 → 安装到 DSH profile → 注册 loader 条目 → 生成配置模板（`~/.dsh/qq-remote.json`），重启 DSH 生效。
@@ -125,7 +125,7 @@ bash install.sh
 
 **Q5: 安装后插件加载报 `Cannot find package '@deepseek-ai/dsh-tools'`**
 - 原因：插件依赖未自包含，解析到了宿主机特定路径
-- 修复：重跑 `bash install.sh`（npm 安装完整依赖树 + 解引用复制，不依赖宿主机位置）
+- 修复：重跑 `bash scripts/install.sh`（npm 安装完整依赖树 + 解引用复制，不依赖宿主机位置）
 
 **Q6: 面板报"服务未就绪 / JSON.parse"**
 - 原因：DSH 刚重启、插件尚未恢复注入
@@ -155,6 +155,14 @@ node test/onebot-mock.mjs 3001
 - 建议通过 NapCat 使用小号/机器人号，避免主号被风控
 
 ## 更新日志
+
+### v0.3.1（2026-08-16）—— 对齐插件市场 STANDARD 规范
+
+- ✅ **修正市场类型判定**：安装脚本移入 `scripts/` 子目录 —— 根目录不再有 `install.sh`，市场正确识别为 **cordis-plugin**（此前会被误判为「脚本型」，跳过构建/依赖/注册/更新/卸载全管线）
+- 📦 **改为产物型**：提交 `lib/` 构建产物，市场安装无需构建弹窗、直接复制使用
+- 📝 package.json 完善：`main` / `repository` / `files`（含 `scripts`）对齐规范；npm 包名唯一性已确认
+- 🛠️ 安装命令更新：`bash scripts/install.sh`（卸载 `bash scripts/uninstall.sh`，诊断 `bash scripts/repair.sh`）
+
 
 ### v0.3.0（2026-08-16）—— 模块化重构 + 彻底卸载
 

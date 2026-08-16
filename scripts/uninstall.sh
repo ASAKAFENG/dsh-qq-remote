@@ -174,6 +174,6 @@ if [ "$PURGE" = "1" ]; then
 else
   echo "=== 卸载完成 ==="
   echo "• 配置 $CFG 与聊天记忆 $CHATS 已保留"
-  echo "  如需一并删除请运行: bash uninstall.sh --purge"
+  echo "  如需一并删除请运行: bash scripts/uninstall.sh --purge"
   echo "• 重启 DSH 生效"
 fi
