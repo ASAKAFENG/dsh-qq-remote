@@ -11,7 +11,7 @@
 
 > 💡 **安装提示**：直接把这个仓库链接发给你的 AI 编程助手（Codex、Claude Code 等），它能按本 README 自行完成安装与配置。
 
-（技术说明：纯 JS 实现、零额外依赖；通过 OneBot 11 协议对接 NapCat / Lagrange.OneBot / go-cqhttp / LLOneBot 等主流 QQ 机器人框架。）
+
 
 ## 功能
 
