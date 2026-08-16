@@ -156,6 +156,13 @@ node test/onebot-mock.mjs 3001
 
 ## 更新日志
 
+### v0.3.0（2026-08-16）—— 模块化重构 + 彻底卸载
+
+- 🧱 **代码重构**：单文件（1700+ 行）拆分为模块化结构 —— `index.js`（装配）+ `util/onebot/chat/commands/panel/qrgen` 六模块，行为完全一致（本机全量回归：消息链路 9/9、面板路由、QR 生成器交叉验证）
+- 🗑️ **彻底卸载**：`uninstall.sh` 增强 —— 移除 patch 条目 + 删除安装目录（含 junction）+ 清理注入器 registry + 清理 profile package.json 残留（dependencies/bundles）；`bash uninstall.sh --purge` 可连配置与聊天记忆一起删除
+- 🧪 **回归测试入库**：`test/e2e.mjs` 一键跑消息链路 + QR 生成器验证（`cd test && node e2e.mjs`）
+- 🩺 保留 v0.2.4 的 install.sh 自愈能力（写前备份、disabled 自动启用、安装后结构检查）
+
 ### v0.2.4（2026-08-16）—— 重装自愈 + 诊断工具
 
 - 🔧 **重装自动启用**：若 patch 中残留 `disabled: true` 的旧条目（卸载残留），重新安装时自动移除 disabled 恢复启用

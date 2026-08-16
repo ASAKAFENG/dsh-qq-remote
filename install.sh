@@ -19,14 +19,18 @@ if [ ! -d "$PROFILE_DIR" ]; then
   exit 1
 fi
 
-# 1. 构建（纯拷贝 index.js/qrgen.js/client.js → lib/，无编译依赖）
+# 1. 构建（纯拷贝源码 → lib/，无编译依赖）
 echo "[1/5] 构建插件…"
 mkdir -p "$ROOT/lib"
 cp "$ROOT/index.js" "$ROOT/lib/index.js"
 cp "$ROOT/qrgen.js" "$ROOT/lib/qrgen.js"
+for m in util.js onebot.js chat.js commands.js panel.js; do
+  cp "$ROOT/$m" "$ROOT/lib/$m" 2>/dev/null || true
+done
 if [ -f "$ROOT/client.js" ]; then cp "$ROOT/client.js" "$ROOT/lib/client.js"; fi
-node --check "$ROOT/lib/index.js"
-node --check "$ROOT/lib/qrgen.js"
+for f in index.js qrgen.js util.js onebot.js chat.js commands.js panel.js; do
+  node --check "$ROOT/lib/$f" || { echo "错误: lib/$f 语法检查失败" >&2; exit 1; }
+done
 test -f "$ROOT/lib/client.js" || { echo "错误: lib/client.js 缺失（前端 bundle 必需）" >&2; exit 1; }
 
 # 2. 解析依赖实际版本（从当前 DSH 运行时探测，避免猜 npx 缓存/硬编码漂移）
