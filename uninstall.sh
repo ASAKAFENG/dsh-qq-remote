@@ -1,7 +1,7 @@
 #!/bin/bash
 # dsh-qq-remote 卸载脚本
 # 用法: bash uninstall.sh
-# 功能: 移除 profile patch 条目 + 删除安装目录（保留 ~/.dsh/qq-remote.json 配置与聊天记忆）
+# 功能: 移除 profile patch 条目 + 删除安装目录 + 清理注入器 registry（防重启复活）
 # 环境: DSH_PROFILE 指定 profile（默认 web）
 set -euo pipefail
 
@@ -76,13 +76,14 @@ for line in out:
         out2.append(line)
         continue
     if indent_of(line) == 0:
+        if line.strip() == "[]":
+            continue
         out2.append(line)
         last_toplevel = bool(re.match(r'^\s*- (insert:|id:)\s', line))
     else:
         if last_toplevel:
             out2.append(line)
 
-# 空结果 → 还原为顶层 []
 if not any(l.strip() for l in out2):
     out2 = ["[]\n"]
 
@@ -103,6 +104,30 @@ if [ -d "$DEST" ] || [ -L "$DEST" ]; then
   echo "      已删除 $DEST"
 else
   echo "      安装目录不存在（跳过）"
+fi
+
+# 3. 清理超级模组注入器 registry（否则 DSH 重启后自动恢复注入，等于没卸载）
+REG="${HOME}/.dsh/super-injector/registry.json"
+if [ -f "$REG" ]; then
+  python3 - "$REG" "$PKG_NAME" <<'PYEOF2'
+import json, sys, os
+path, pkg_name = sys.argv[1], sys.argv[2]
+try:
+    with open(path, encoding="utf-8") as f:
+        data = json.load(f)
+except Exception:
+    sys.exit(0)
+if not isinstance(data, list):
+    sys.exit(0)
+before = len(data)
+data = [e for e in data if not (isinstance(e, dict) and e.get("name") == pkg_name)]
+if len(data) != before:
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+    os.replace(tmp, path)
+    print("      已清理注入器 registry 条目")
+PYEOF2
 fi
 
 echo "=== 卸载完成 ==="
