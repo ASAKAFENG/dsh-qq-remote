@@ -57,8 +57,8 @@
 
 **平台支持情况：**
 - ✅ **已在 Ubuntu 环境验证安装通过**（一键安装脚本、插件市场 cordis-plugin 安装管线、NapCat 引导、扫码登录全链路均实测可用）
-- ✅ **全平台通用**：QQ 消息桥接、任务派发、阶段汇报、AI 聊天、会话管理、Agent 工具
-- ⚠️ **macOS / Windows**：核心功能可用；`/exec` 需环境提供 bash（如 WSL / Git Bash）；截图需在 `screenshotCommand` 配置本平台工具（如 macOS `screencapture -x <path>`），否则 `/screenshot` 不可用
+
+（如 WSL / Git Bash）；截图需在 `screenshotCommand` 配置本平台工具（如 macOS `screencapture -x <path>`），否则 `/screenshot` 不可用
 
 ## 安装与配置
 
@@ -104,9 +104,9 @@ bash scripts/install.sh
 完整配置项见 `USAGE.md`（含 `reportMode`/`phaseIntervalMs`/`chatSessionNames` 等全部字段）。
 
 
-## 快速上手（安装后）
+## 快速上手
 
-1. **配置白名单**：编辑 `~/.dsh/qq-remote.json`，把 `allowedUsers` 改成你的 QQ 号（默认示例 `[123456789]` 会放行任意消息，务必替换）
+1. **配置白名单**：通过设置里面的 QQ远程 来配置 或者 `~/.dsh/qq-remote.json`，把 `allowedUsers` 改成你的 QQ 号（默认示例 `[123456789]` 会放行任意消息，务必替换）
 2. **重启 DSH** 让插件加载生效（或热重载）
 3. **准备 NapCat**（QQ 协议桥，插件需要它才能收发消息）：
    - 已有 NapCat：确认它在运行（DSH 设置页「QQ 远程」面板会显示连接状态）
