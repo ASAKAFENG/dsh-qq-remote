@@ -154,6 +154,20 @@ node test/onebot-mock.mjs 3001
 
 ## 更新日志
 
+### v0.2.1（2026-08-16）—— 安装可靠性修复（社区评审驱动）
+
+**安装/卸载**
+- 🔧 YAML-aware patch 写入：正确处理空模板 `[]`、精确幂等匹配、原子替换（临时文件+rename）
+- 🔧 client 路径统一：`exports["./client"]` 指向 `lib/client.js`（唯一路径），安装后强制校验存在
+- 🔧 新增 `dsh.bundle.patch` 声明：支持 `dsh plugin` 官方安装流程（profile bundle 装配）
+- 🔧 依赖版本从当前 DSH 运行时探测（不再猜 npx 缓存 / 硬编码漂移）
+- 🔧 新增 `uninstall.sh`：移除 patch 条目 + 删除安装目录 + 清理注入器 registry（防重启复活）
+- 🔧 平台表述修正：明确 Linux/macOS（Windows 需 WSL 或 Git Bash）
+
+**体验**
+- 🐛 面板容错：服务未就绪时显示友好提示并自动重试（不再报 JSON.parse 原始错误）
+- 🎭 默认聊天人设改为中性"聊天格式"预设（不定义角色，角色可自由配置）
+
 ### v0.2.0（2026-08-15）
 
 **新功能**
