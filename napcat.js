@@ -227,16 +227,19 @@ export function createNapcat(state, deps = {}) {
       }
     };
     try {
-      // 0) 已有活跃 NapCat 服务？（防双实例顶号；测试可跳过）
+      // 0) 已有活跃"外部" NapCat 服务？（防双实例顶号；测试可跳过）。
+      //    插件托管的 dsh-napcat.service 不跳过——允许重写配置/参数并重启。
       if (!opts.skipActiveCheck) {
         const pref = config.napcatServiceName || "napcat-qq";
-        try {
-          const r = await runProcess("systemctl", ["--user", "is-active", pref], { timeout: 5000 });
-          if (String(r.out ?? "").trim() === "active") {
-            push("detect", true, `已有 NapCat 服务在运行（${pref}），无需引导`);
-            return { ok: true, message: "NapCat 已在运行", steps };
-          }
-        } catch {}
+        if (pref !== SVC_NAME) {
+          try {
+            const r = await runProcess("systemctl", ["--user", "is-active", pref], { timeout: 5000 });
+            if (String(r.out ?? "").trim() === "active") {
+              push("detect", true, `已有 NapCat 服务在运行（${pref}），无需引导`);
+              return { ok: true, message: "NapCat 已在运行", steps };
+            }
+          } catch {}
+        }
       }
       // 1) 已安装？
       let dir = null;
@@ -275,7 +278,8 @@ export function createNapcat(state, deps = {}) {
       const unitPath = path.join(os.homedir(), ".config", "systemd", "user", SVC_NAME);
       fs.mkdirSync(path.dirname(unitPath), { recursive: true });
       const unit = serviceTemplate(dir, entryFile, qq);
-      if (!fs.existsSync(unitPath) || fs.readFileSync(unitPath, "utf8") !== unit) {
+      const unitChanged = !fs.existsSync(unitPath) || fs.readFileSync(unitPath, "utf8") !== unit;
+      if (unitChanged) {
         const tmp = unitPath + ".tmp";
         fs.writeFileSync(tmp, unit);
         fs.renameSync(tmp, unitPath);
@@ -288,10 +292,10 @@ export function createNapcat(state, deps = {}) {
       if (!qq) {
         push("hint", true, "提示：未配置机器人 QQ 号，NapCat 不会生成登录二维码。请在设置「QQ 远程」面板填写机器人 QQ 号（napcatQQ）后重新引导，或在 NapCat WebUI 中添加账号。");
       }
-      // 4) 启动
+      // 4) 启动（unit 变更时强制重启以应用新参数）
       const st = await serviceState(SVC_NAME);
-      if (!st.active) {
-        await runProcess("systemctl", ["--user", "start", SVC_NAME], { timeout: 15000 });
+      if (!st.active || unitChanged) {
+        await runProcess("systemctl", ["--user", "restart", SVC_NAME], { timeout: 15000 });
       }
       const st2 = await serviceState(SVC_NAME);
       if (!st2.active) {

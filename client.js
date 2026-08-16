@@ -84,6 +84,7 @@ window.__ModuleLoader__.load({
       rWaiting: "⏳ 等待二维码生成…（插件自动从 NapCat WebUI 获取，约 30-60 秒）",
       bsTitle: "🧩 NapCat 引导（开箱即用）",
       bsBtn: "一键安装/启动 NapCat",
+      bsBtn2: "重新应用 NapCat 服务（修复）",
       bsBusy: "正在引导 NapCat（下载约 30MB，首次需几分钟）…",
       bsDone: "✅ NapCat 已启动，等待二维码…",
       bsFail: "一键安装/启动 NapCat",
@@ -132,6 +133,7 @@ window.__ModuleLoader__.load({
       rWaiting: "⏳ Waiting for QR… (auto-fetch from NapCat WebUI, ~30-60s)",
       bsTitle: "🧩 NapCat bootstrap (out-of-box)",
       bsBtn: "Install / Start NapCat",
+      bsBtn2: "Re-apply NapCat service (fix)",
       bsBusy: "Bootstrapping NapCat (~30MB download on first run)…",
       bsDone: "✅ NapCat started, waiting for QR…",
       bsFail: "Install / Start NapCat",
@@ -149,7 +151,7 @@ window.__ModuleLoader__.load({
     // ── Section component ─────────────────────────────────────────────────
     function QqRemoteSection(props) {
       var t = props.t || function (k) { return zh[k] || k; };
-      var state = react.useState({ loading: true, loggedIn: false, ws: false, qr: false, busy: false, reason: "", bsBusy: false, bsSteps: [], msg: "", wl: [], wlInput: "", wlMsg: "", mirrors: [], dlId: "official", dlCustom: "", qq: "" });
+      var state = react.useState({ loading: true, loggedIn: false, ws: false, qr: false, busy: false, reason: "", bsBusy: false, bsSteps: [], msg: "", wl: [], wlInput: "", wlMsg: "", mirrors: [], dlId: "official", dlCustom: "", qq: "", bsRan: false });
       var st = state[0];
       var set = state[1];
       var qrTimer = react.useRef(null);
@@ -240,7 +242,7 @@ window.__ModuleLoader__.load({
       };
 
       var startBootstrap = async function () {
-        set(function (prev) { return Object.assign({}, prev, { bsBusy: true, bsSteps: [] }); });
+        set(function (prev) { return Object.assign({}, prev, { bsBusy: true, bsSteps: [], bsRan: true }); });
         try {
           await fetch("/qq-remote/napcat/bootstrap", { method: "POST" });
         } catch (e) {}
@@ -296,19 +298,19 @@ window.__ModuleLoader__.load({
             ? h("img", { src: "/qq-remote/qrcode?t=" + Date.now(), alt: "QR" })
             : h("div", { className: "__qr_hint" }, reasonText()),
           h("div", { className: "__qr_hint" }, t("qrHint"))),
-        (!st.loggedIn && st.reason === "napcat_not_running" && !st.loading)
+        (!st.loggedIn && !st.loading)
           ? h("div", { className: "__qr_group" }, t("bsTitle")) : null,
-        (!st.loggedIn && st.reason === "napcat_not_running" && !st.loading)
+        (!st.loggedIn && !st.loading)
           ? h("button", {
             className: "__qr_btn",
             disabled: st.bsBusy,
             onClick: startBootstrap
-          }, st.bsBusy ? t("bsBusy") : t("bsBtn")) : null,
+          }, st.bsBusy ? t("bsBusy") : (st.bsRan ? t("bsBtn2") : t("bsBtn"))) : null,
         (st.bsSteps && st.bsSteps.length > 0)
           ? h("div", { className: "__qr_hint" }, (st.bsSteps || []).map(function (s) { return (s.ok ? "✅" : "⏳") + " " + s.step + " — " + s.message; }).join("\n")) : null,
-        (!st.loggedIn && st.reason === "napcat_not_running" && !st.loading)
+        (!st.loggedIn && !st.loading)
           ? h("div", { className: "__qr_group" }, t("qqTitle")) : null,
-        (!st.loggedIn && st.reason === "napcat_not_running" && !st.loading)
+        (!st.loggedIn && !st.loading)
           ? h("div", { className: "__qr_row" },
             h("input", {
               className: "__qr_input",
@@ -317,9 +319,9 @@ window.__ModuleLoader__.load({
               onChange: function (e) { set(function (prev) { return Object.assign({}, prev, { qq: e.target.value }); }); }
             }),
             h("span", { className: "__qr_label", style: { fontSize: "12px" } }, t("qqHint"))) : null,
-        (!st.loggedIn && st.reason === "napcat_not_running" && !st.loading)
+        (!st.loggedIn && !st.loading)
           ? h("div", { className: "__qr_group" }, t("dlTitle")) : null,
-        (!st.loggedIn && st.reason === "napcat_not_running" && !st.loading)
+        (!st.loggedIn && !st.loading)
           ? h("div", { className: "__qr_row" },
             h("select", {
               className: "__qr_input",
@@ -331,7 +333,7 @@ window.__ModuleLoader__.load({
                 return h("option", { key: m.id, value: m.id }, m.name);
               }),
               h("option", { key: "custom", value: "custom" }, t("dlCustom")))) : null,
-        (!st.loggedIn && st.reason === "napcat_not_running" && !st.loading && st.dlId === "custom")
+        (!st.loggedIn && !st.loading && st.dlId === "custom")
           ? h("div", { className: "__qr_row" },
             h("input", {
               className: "__qr_input",
@@ -339,7 +341,7 @@ window.__ModuleLoader__.load({
               value: st.dlCustom,
               onChange: function (e) { set(function (prev) { return Object.assign({}, prev, { dlCustom: e.target.value }); }); }
             })) : null,
-        (!st.loggedIn && st.reason === "napcat_not_running" && !st.loading)
+        (!st.loggedIn && !st.loading)
           ? h("div", { className: "__qr_row" },
             h("button", { className: "__qr_btn", onClick: saveDl }, t("dlSave")),
             h("span", { className: "__qr_label", style: { fontSize: "12px" } }, t("dlHint"))) : null,
@@ -387,7 +389,7 @@ window.__ModuleLoader__.load({
                 body: JSON.stringify({ allowedUsers: st.wl })
               });
               var j = await r.json();
-              set(function (prev) { return Object.assign({}, prev, { wlMsg: j.ok ? t("wlSaved") : t("wlSaveFail") }); });
+              set(function (prev) { return Object.assign({}, prev, { wlMsg: j.ok ? t("wlSaved") : ("⚠️ " + (j.error || t("wlSaveFail"))) }); });
             } catch (e) {
               set(function (prev) { return Object.assign({}, prev, { wlMsg: t("wlSaveFail") }); });
             }
