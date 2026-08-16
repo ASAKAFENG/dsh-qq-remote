@@ -56,9 +56,9 @@
 | 平台 | Linux 完整支持；macOS / Windows 核心功能可用（见下） |
 
 **平台支持情况：**
+- ✅ **已在 Ubuntu 环境验证安装通过**（一键安装脚本、插件市场 cordis-plugin 安装管线、NapCat 引导、扫码登录全链路均实测可用）
 - ✅ **全平台通用**：QQ 消息桥接、任务派发、阶段汇报、AI 聊天、会话管理、Agent 工具
-- ⚠️ **Linux 最佳**：`/exec` 使用 bash；截图自动走 xdg-desktop-portal / grim / scrot 等
-- ⚠️ **macOS / Windows**：`/exec` 需环境提供 bash（如 WSL / Git Bash）；截图需在 `screenshotCommand` 配置本平台工具（如 macOS `screencapture -x <path>`），否则 `/screenshot` 不可用
+- ⚠️ **macOS / Windows**：核心功能可用；`/exec` 需环境提供 bash（如 WSL / Git Bash）；截图需在 `screenshotCommand` 配置本平台工具（如 macOS `screencapture -x <path>`），否则 `/screenshot` 不可用
 
 ## 安装与配置
 
@@ -132,6 +132,34 @@ bash scripts/install.sh
 - 原因：DSH 刚重启、插件尚未恢复注入
 - 修复：等 10~30 秒自动恢复；面板会自愈显示
 
+**Q7: 二维码不显示 / 一直"等待二维码"**
+- 原因：绝大多数是 **NapCat 没在运行**（未安装 / 服务未启动 / 登录态失效）
+- 排查：打开 `http://127.0.0.1:3080/qq-remote/panel`，面板会直接显示原因：
+  - `NapCat 未启动` → 点「一键安装/启动 NapCat」自动安装配置启动（或手动 `systemctl --user start napcat-qq`）
+  - `未找到 WebUI 配置` → 检查 NapCat 是否生成过 `config/webui.json`，或在 `~/.dsh/qq-remote.json` 配置 `qrcodePath`
+  - `二维码已过期` → NapCat 会自动重新生成，稍等
+- 提示：扫码登录是 QQ 安全机制，任何方式都无法跳过；面板二维码 2 分钟有效、自动刷新
+
+**Q8: 一键安装/启动 NapCat 很慢**
+- 原因：需要从网络下载约 29MB 的 NapCat.Shell（国内访问 GitHub 较慢）
+- 修复：① 设置页「NapCat 下载源」切换镜像（gh-proxy.com / ghfast.top）；② 手动下载 `NapCat.Shell.zip` 放到 `~/.dsh/NapCat.Shell.zip`（>5MB 自动跳过下载）；③ 面板会实时显示下载进度
+
+**Q9: 引导安装报 `Cannot read properties of undefined (reading 'dirname')`**
+- 原因：v0.3.2 的路径误用 bug
+- 修复：升级到 **v0.3.3+** 已修复
+
+**Q10: 有两个 NapCat 实例互相顶下线（QQ 被挤掉线）**
+- 原因：手动启动了一个 NapCat，又点了引导安装，两个实例抢同一账号
+- 修复：v0.3.3+ 引导前自动检测已有活跃服务并跳过；`systemctl --user status` 确认只保留一个实例
+
+**Q11: 安装后其他插件（如皮肤 UI）失效**
+- 原因：旧版 install.sh 会重写已有 patch 条目，误删其他插件的嵌套配置
+- 修复：升级到 **v0.3.1+**（只做幂等追加，不再改动已有条目）；已损坏的环境运行 `bash scripts/repair.sh` 诊断，或重新安装皮肤插件
+
+**Q12: 市场安装后没有"更新"按钮 / 被识别成"脚本型"**
+- 原因：根目录有 `install.sh` 会被市场误判为脚本型（v0.3.0 及更早）
+- 修复：升级到 **v0.3.1+**（安装脚本已移入 `scripts/` 子目录，市场正确识别为 cordis-plugin，支持版本检测/更新/卸载）
+
 ## 截图原理
 
 优先调用 xdg-desktop-portal 的 `Screenshot`（GNOME Wayland 非交互截屏，无需额外安装）；
@@ -158,6 +186,12 @@ node test/onebot-mock.mjs 3001
 - **安装/引导 NapCat 很慢？** 引导需要从 GitHub 下载约 29MB 的 NapCat.Shell，国内网络可能需数分钟——面板会实时显示下载进度。嫌慢可：① 手动下载 `NapCat.Shell.zip` 放到 `~/.dsh/NapCat.Shell.zip`（检测到即跳过下载）；② 在 `~/.dsh/qq-remote.json` 配置 `napcatDownloadUrl` 指向镜像或本地文件。
 
 ## 更新日志
+
+### v0.3.7（2026-08-16）—— README 更新
+
+- 📝 平台支持情况：明确**已在 Ubuntu 环境验证安装通过**
+- 📝 安装疑难（常见问题）重写为最新版：新增二维码不显示 / 引导下载慢 / dirname 报错 / 双实例顶号 / 皮肤失效 / 市场误判等 Q7-Q12
+
 
 ### v0.3.6（2026-08-16）—— 设置面板可配置 NapCat 下载源
 
