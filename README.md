@@ -157,6 +157,14 @@ node test/onebot-mock.mjs 3001
 
 ## 更新日志
 
+### v0.3.3（2026-08-16）—— 引导修复：dirname bug + 防双实例顶号
+
+- 🐛 **修复引导崩溃**：`Cannot read properties of undefined (reading 'dirname')` —— `os.path.dirname` 误用修正为 `path.dirname`
+- 🛡️ **防双实例顶号**：bootstrap 前检查已有活跃 NapCat 服务 / OneBot 连接，存在则跳过并提示（不再出现"两个 NapCat 抢同一 QQ 账号互相顶下线"）
+- 🔒 **安装目录排他**：配置 `napcatInstallDir` 时只信任配置值，不再扫描其他候选
+- 🧪 e2e 扩至 19 用例（防顶号跳过、下载失败结构化错误路径）
+
+
 ### v0.3.2（2026-08-16）—— 开箱即用：NapCat 引导 + 二维码诊断
 
 - 🧩 **一键安装 NapCat**：面板新增「一键安装/启动 NapCat」—— 自动下载官方 NapCat.Shell → 解压 → 幂等写入 OneBot11 反向 WS 配置（3001）→ 注册 systemd 用户服务 `dsh-napcat.service` → 启动 → 二维码自动出现，扫码即登录

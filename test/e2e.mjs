@@ -1,3 +1,4 @@
+import fs from "node:fs";
 /**
  * e2e.mjs — dsh-qq-remote 模块化回归测试。
  *
@@ -125,6 +126,24 @@ check("已登录 → 空 reason", classifyQrReason({ ok: false, loggedIn: true, 
 // ── NapCat 引导模块可加载 ─────────────────────────────────────
 const nap = createNapcat({ config, log: ctx.logger });
 check("napcat 模块导出 detect/bootstrap", typeof nap.detect === "function" && typeof nap.bootstrap === "function");
+
+// ── bootstrap 防顶号：已有活跃服务 → 跳过并返回 ok ────────────
+const bsGuard = await nap.bootstrap(3001);
+check("bootstrap 防顶号（有活跃服务 → ok:true 跳过）", bsGuard.ok === true && /无需引导|已在运行/.test(bsGuard.steps[0]?.message ?? ""));
+
+// ── bootstrap 错误路径（下载失败应返回结构化错误而非崩溃） ────
+const origFetch = globalThis.fetch;
+globalThis.fetch = async () => ({ ok: false, status: 404 });
+const origInstallDir = config.napcatInstallDir;
+config.napcatInstallDir = "/tmp/dsh-e2e-napcat-empty";
+try {
+  fs.rmSync(config.napcatInstallDir, { recursive: true, force: true });
+} catch {}
+const bs = await nap.bootstrap(3001, { skipActiveCheck: true });
+check("bootstrap 下载失败 → ok:false", bs.ok === false);
+check("bootstrap 无 dirname 崩溃", !/dirname/.test(bs.message ?? "") && bs.steps.every((s) => !/dirname/.test(s.message ?? "")));
+globalThis.fetch = origFetch;
+config.napcatInstallDir = origInstallDir;
 
 wss.close();
 console.log(`\n结果: ${pass} PASS / ${fail} FAIL`);
