@@ -1,5 +1,5 @@
 /**
- * dsh-qq-remote — QQ 图形开关面板：状态 / 重新登录 / 二维码自动获取 / 白名单 / NapCat 引导。
+ * dsh-qq-remote — QQ 图形开关面板：状态 / 重新登录 / 二维码自动获取 / 白名单 / NapCat 诊断。
  * 工厂函数 createPanel(state)。
  * 二维码获取：WebUI API（自动读 webui.json，带缓存与失败退避）→ 文件探测 → systemd/NAPCAT_WORKDIR//proc 反推。
  * 诊断：qrReason 区分 napcat_not_running / webui_not_found / stale_qrcode / waiting。
@@ -15,8 +15,7 @@ const SVC_NAME = "dsh-napcat.service";
 
 /** QR 诊断分类（纯函数，便于测试）。
  *  serviceActive：NapCat 服务**正在运行**（unit active）。
- *  serviceExists：systemd 中存在 napcat 相关 unit（可能未运行）。
- *  "未运行" = unit 不存在或 inactive —— 都归 napcat_not_running（引导按钮显示）。 */
+ *  "未运行" = unit 不存在或 inactive —— 都归 napcat_not_running（提示用户安装启动）。 */
 export function classifyQrReason({ ok, loggedIn, serviceActive, webuiAvailable, qrFileExists, qrFileFresh }) {
   if (loggedIn) return "";
   // 服务未运行优先于一切（停止时的二维码残留是死码，扫码无效）
@@ -161,7 +160,7 @@ export function createPanel(state) {
     return null;
   }
 
-  /** 查找 NapCat systemd 用户服务：配置值 → 插件托管服务 → 扫描含 napcat 的 unit。
+  /** 查找 NapCat systemd 用户服务：配置值 → 常见服务名 → 扫描含 napcat 的 unit。
    *  返回 { name, active }；无则 null。active = 正在运行（is-active）。 */
   let svcCache = null;
   let svcCacheAt = 0;

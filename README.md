@@ -153,9 +153,14 @@ node test/onebot-mock.mjs 3001
 - `/exec` 可执行任意命令；`execAllowed: false` 可整体禁用
 - 建议通过 NapCat 使用小号/机器人号，避免主号被风控
 
-- **安装/引导 NapCat 很慢？** 引导需要从 GitHub 下载约 29MB 的 NapCat.Shell，国内网络可能需数分钟——面板会实时显示下载进度。嫌慢可：① 手动下载 `NapCat.Shell.zip` 放到 `~/.dsh/NapCat.Shell.zip`（检测到即跳过下载）；② 在 `~/.dsh/qq-remote.json` 配置 `napcatDownloadUrl` 指向镜像或本地文件。
 
 ## 更新日志
+
+### v0.3.16（2026-08-16）—— 清理引导残留文案
+
+- 🧹 全面清理移除一键引导后的残留：panel.js 注释/头部描述、设置面板与完整面板的"一键安装/启动 NapCat"提示文案（改为指向 README 前置依赖）、README 遗留 FAQ 行
+- 🔧 relogin/诊断提示统一指向"README 前置依赖 + WebUI 3001 配置"
+
 
 ### v0.3.15（2026-08-16）—— 移除一键引导，回归"前置依赖 NapCat"模式
 
