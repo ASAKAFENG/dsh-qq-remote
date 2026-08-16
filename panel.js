@@ -25,10 +25,15 @@ export function classifyQrReason({ ok, loggedIn, serviceActive, webuiAvailable, 
   return "waiting";
 }
 
-/** 二维码文件是否新鲜（10 分钟内）。 */
+/** 二维码新鲜窗口（NapCat 二维码约 2 分钟有效，3 分钟内未更新视为过期）。 */
+const QR_FRESH_MS = 3 * 60 * 1000;
+/** 连续过期判定：超过 6 分钟未更新 = 死码，可清理文件。 */
+const QR_STALE_CLEANUP_MS = 6 * 60 * 1000;
+
+/** 二维码文件是否新鲜（QR_FRESH_MS 内更新过）。 */
 function qrFresh(p) {
   try {
-    return Date.now() - fs.statSync(p).mtimeMs < 10 * 60 * 1000;
+    return Date.now() - fs.statSync(p).mtimeMs < QR_FRESH_MS;
   } catch {
     return false;
   }
@@ -138,6 +143,16 @@ export function createPanel(state) {
     return null;
   }
 
+  /** 找到过期的二维码文件（存在但超过新鲜窗口）。 */
+  function findStaleQrcode() {
+    for (const p of QR_CANDIDATES()) {
+      try {
+        if (fs.existsSync(p) && !qrFresh(p)) return p;
+      } catch {}
+    }
+    return null;
+  }
+
   /** NapCat WebUI 配置（port/token/prefix）：优先用户配置，其次自动探测 webui.json。 */
   function findWebuiConfig() {
     const port = config.webuiPort || 6099;
@@ -192,6 +207,8 @@ export function createPanel(state) {
 
   /** NapCat WebUI 登录凭据（1 小时有效，缓存 50 分钟；NapCat 重启后自动重登）。 */
   let webuiCredentialCache = null;
+  /** 上次成功取到二维码 URL 的时间（2.5 分钟陈旧后强制 Refresh 重取）。 */
+  let webuiQrAt = 0;
   async function webuiCredential() {
     const wc = findWebuiConfig();
     if (!wc || !wc.token) return null;
@@ -234,11 +251,13 @@ export function createPanel(state) {
       return null;
     };
     let url = await getUrl();
-    if (!url) {
-      // 二维码过期/未生成：先刷新再取一次
+    const staleUrl = webuiQrAt !== 0 && Date.now() - webuiQrAt > 2.5 * 60 * 1000;
+    if (!url || staleUrl) {
+      // 二维码过期/未生成/URL 陈旧（NapCat 内存缓存旧值）：先刷新再取一次
       try { await fetch(base + "/RefreshQRcode", { method: "POST", headers, body: "{}", signal: AbortSignal.timeout(5000) }); } catch {}
       url = await getUrl();
     }
+    if (url) webuiQrAt = Date.now();
     if (!url) return null;
     try {
       // 老格式端点（ssl.ptlogin2.qq.com/ptqrshow）直接返回 PNG 图片
@@ -251,6 +270,18 @@ export function createPanel(state) {
     } catch {}
     // 新格式（txz.qq.com/p 等）：内容是链接，本地生成二维码 PNG（零依赖）
     return qrToPng(url, { scale: 4, margin: 4 });
+  }
+
+  /** 仅触发 NapCat WebUI 刷新二维码（不取 URL，供过期场景用）。 */
+  async function fetchQrcodeViaWebuiRefresh() {
+    const wc = findWebuiConfig();
+    if (!wc || !wc.token) return;
+    const cred = await webuiCredential();
+    if (!cred) return;
+    const base = `http://127.0.0.1:${cred.port}${cred.prefix ? "/" + cred.prefix : ""}/api/QQLogin`;
+    try {
+      await fetch(base + "/RefreshQRcode", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${cred.cred}` }, body: "{}", signal: AbortSignal.timeout(5000) });
+    } catch {}
   }
 
   /** 二维码获取总入口：带 5s 结果缓存 + WebUI 失败 10s 退避（避免轮询触发登录限流）。 */
@@ -273,6 +304,22 @@ export function createPanel(state) {
       try {
         buf = fs.readFileSync(p);
       } catch {}
+    }
+    if (!buf) {
+      // 有旧码但已过期：尝试让 NapCat 刷新（webui RefreshQRcode），成功后下一轮取到新码
+      const stalePath = findStaleQrcode();
+      if (stalePath) {
+        try {
+          await fetchQrcodeViaWebuiRefresh();
+        } catch {}
+        // 连续过期（>6 分钟）：清理死码文件，让 UI 明确进入 waiting（NapCat 刷新后会重写）
+        try {
+          if (Date.now() - fs.statSync(stalePath).mtimeMs > QR_STALE_CLEANUP_MS) {
+            fs.unlinkSync(stalePath);
+            log.info(`[qq-remote] 清理过期二维码文件: ${stalePath}`);
+          }
+        } catch {}
+      }
     }
     if (!buf) {
       // systemd NAPCAT_WORKDIR / /proc 反推的最后机会
@@ -463,14 +510,15 @@ refresh();setInterval(refresh,5000);
         ]);
         const svc = await findNapcatServiceName();
         const qrPath = findQrcode();
+        const stalePath = findStaleQrcode();
         const webui = findWebuiConfig();
         const reason = classifyQrReason({
           ok: Boolean(qrBuf),
           loggedIn,
           serviceActive: svc ? svc.active : false,
           webuiAvailable: webui != null,
-          qrFileExists: qrPath != null,
-          qrFileFresh: qrPath ? qrFresh(qrPath) : false,
+          qrFileExists: qrPath != null || stalePath != null,
+          qrFileFresh: qrPath != null,
         });
         json(res, {
           loggedIn,

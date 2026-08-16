@@ -153,6 +153,16 @@ node test/onebot-mock.mjs 3001
 
 ## 更新日志
 
+### v0.3.13（2026-08-16）—— 二维码过期自动刷新（不再显示死码）
+
+- 🐛 **根因**：二维码约 2 分钟有效，但插件 10 分钟内都视为"新鲜"——过期旧码一直显示，扫码提示失效
+- 🔧 **新鲜窗口收紧**：文件模式 10 分钟 → 3 分钟；过期时自动调用 NapCat WebUI `RefreshQRcode` 强制换新码
+- 🔧 **死码清理**：连续 6 分钟未更新的二维码文件自动删除（UI 明确进入等待，NapCat 刷新后重写）
+- 🔧 **WebUI URL 陈旧检测**：取到的二维码 URL 超过 2.5 分钟自动 Refresh 重取（不再长期显示内存缓存的旧码）
+- 🔧 修复 status 400（findStaleQrcode 作用域错误）
+- 🧪 e2e 25 用例保持全过
+
+
 ### v0.3.12（2026-08-16）—— Linux 引导修复：NapCat 经 launcher 注入 QQ 宿主
 
 - 🐛 **根因**：NapCat.Shell 在 Linux 上不是独立程序，`node napcat.mjs` 直启会失败（`--no-sandbox` 传给 node / 找不到 QQ 资源）
