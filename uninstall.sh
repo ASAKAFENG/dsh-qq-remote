@@ -9,57 +9,84 @@ ROOT="$(cd "$(dirname "$0")" && pwd)"
 PROFILE="${DSH_PROFILE:-web}"
 PROFILE_DIR="${HOME}/.dsh/profiles/${PROFILE}"
 PKG_ID='dsh-qq-remote'
+PKG_NAME='@dsh-external/dsh-qq-remote'
 
 echo "=== dsh-qq-remote 卸载（profile: ${PROFILE}）==="
 
-# 1. 移除 patch 条目（精确删除该 id 的条目块：- insert: 及其子列表，或裸 - id: 行）
+# 1. 移除 patch 条目（两遍：删除目标块 → 清理悬挂子行）
 PATCH="$PROFILE_DIR/cordis.patch.yml"
 if [ -f "$PATCH" ]; then
-  python3 - "$PATCH" "$PKG_ID" <<'PYEOF'
+  python3 - "$PATCH" "$PKG_ID" "$PKG_NAME" <<'PYEOF'
 import re, sys, os
-path, pkg_id = sys.argv[1], sys.argv[2]
+path, pkg_id, pkg_name = sys.argv[1], sys.argv[2], sys.argv[3]
 with open(path, encoding="utf-8") as f:
     lines = f.readlines()
 
+def indent_of(line):
+    return len(line) - len(line.lstrip())
+
+def block_end(i):
+    base = indent_of(lines[i])
+    j = i + 1
+    while j < len(lines):
+        if not lines[j].strip():
+            j += 1
+            continue
+        if indent_of(lines[j]) <= base:
+            break
+        j += 1
+    return j
+
+def is_target_id(line):
+    return re.match(r'^\s*- id:\s*' + re.escape(pkg_id) + r'\s*$', line)
+
+# 第一遍：删除目标条目块（- insert: 包裹块 / 裸 - id: 块）
 out = []
-i = 0
 removed = False
+i = 0
 while i < len(lines):
     line = lines[i]
-    # 匹配 `- insert:` 块，检查其子列表是否含目标 id
     if re.match(r'^\s*- insert:\s*$', line):
-        j = i + 1
-        sub = []
-        while j < len(lines) and re.match(r'^\s+- ', lines[j]):
-            sub.append(lines[j]); j += 1
-        if sub and re.search(r'^\s+- id:\s*' + re.escape(pkg_id) + r'\s*$', sub[0], re.M):
-            # 删除该块（含前面紧跟的注释行）
+        j = block_end(i)
+        block = lines[i:j]
+        if any(re.match(r'^\s+- id:\s*' + re.escape(pkg_id) + r'\s*$', l) for l in block):
             while out and re.match(r'^\s*#', out[-1]):
                 out.pop()
             removed = True
             i = j
             continue
-        out.append(line)
-        out.extend(sub)
+        out.extend(block)
         i = j
         continue
-    # 匹配裸 `- id: dsh-qq-remote`（disabled 条目等）
-    if re.match(r'^\s*- id:\s*' + re.escape(pkg_id) + r'\s*$', line):
+    if is_target_id(line):
+        j = block_end(i)
         while out and re.match(r'^\s*#', out[-1]):
             out.pop()
         removed = True
-        i += 1
+        i = j
         continue
     out.append(line)
     i += 1
 
-# 空结果 → 还原为顶层 []
-while out and not out[-1].strip():
-    out.pop()
-if not any(l.strip() for l in out):
-    out = ["[]\n"]
+# 第二遍：清理悬挂子行（父块已被删的 name:/config: 等残留）
+out2 = []
+last_toplevel = False
+for line in out:
+    if not line.strip():
+        out2.append(line)
+        continue
+    if indent_of(line) == 0:
+        out2.append(line)
+        last_toplevel = bool(re.match(r'^\s*- (insert:|id:)\s', line))
+    else:
+        if last_toplevel:
+            out2.append(line)
 
-new = "".join(out)
+# 空结果 → 还原为顶层 []
+if not any(l.strip() for l in out2):
+    out2 = ["[]\n"]
+
+new = "".join(out2)
 if new != "".join(lines):
     tmp = path + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:

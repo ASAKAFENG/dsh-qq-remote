@@ -87,6 +87,22 @@ entry = ("\n- insert:\n"
          "    - id: " + pkg_id + "\n"
          "      name: '" + pkg_name + "'\n"
          "      config: {}\n")
+# 清理悬挂子行（历史残留：父块被删的 name:/config: 等）
+cleaned = []
+last_toplevel = False
+for line in content.split("\n"):
+    if not line.strip():
+        cleaned.append(line); continue
+    ind = len(line) - len(line.lstrip())
+    if ind == 0:
+        if line.strip() == "[]":
+            continue  # 顶层 [] 模板：追加条目时无意义，丢弃
+        cleaned.append(line)
+        last_toplevel = bool(re.match(r'^\s*- (insert:|id:)\s', line))
+    elif last_toplevel:
+        cleaned.append(line)
+content = "\n".join(cleaned)
+
 new_content = content.rstrip() + "\n" + entry if content.strip() else entry.lstrip("\n")
 # 原子替换（临时文件 + rename，避免写一半）
 tmp = path + ".tmp"
