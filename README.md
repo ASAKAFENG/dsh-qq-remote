@@ -57,8 +57,7 @@
 
 **平台支持情况：**
 - ✅ **已在 Ubuntu 环境验证安装通过**（一键安装脚本、插件市场 cordis-plugin 安装管线、NapCat 引导、扫码登录全链路均实测可用）
-
-（如 WSL / Git Bash）；截图需在 `screenshotCommand` 配置本平台工具（如 macOS `screencapture -x <path>`），否则 `/screenshot` 不可用
+- ⚠️ **macOS / Windows**：`/exec` 需环境提供 bash（如 WSL / Git Bash）；截图需在 `screenshotCommand` 配置本平台工具（如 macOS `screencapture -x <path>`），否则 `/screenshot` 不可用
 
 ## 安装与配置
 
