@@ -120,7 +120,7 @@ window.__ModuleLoader__.load({
               return next;
             });
           } catch (e) {
-            if (alive) set({ loading: false, loggedIn: false, ws: false, qr: false, busy: false, msg: t("failed") + ": " + e.message });
+            if (alive) set({ loading: false, loggedIn: false, ws: false, qr: false, busy: false, msg: t("failed") + "（服务未就绪，自动重试中…）" });
           }
         };
         load();

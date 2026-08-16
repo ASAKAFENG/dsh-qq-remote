@@ -1482,7 +1482,7 @@ async function refresh(){
     if(polling&&s.qrAvailable)showQr();
     if(polling&&s.loggedIn){stopPoll();log('✅ 登录成功');}
     if(!s.loggedIn&&s.qrAvailable)showQr();
-  }catch(e){log('状态获取失败: '+e.message);}
+  }catch(e){log('服务未就绪，自动重试中…');}
 }
 function showQr(){
   $('qrwrap').style.display='block';
