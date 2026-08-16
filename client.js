@@ -82,21 +82,7 @@ window.__ModuleLoader__.load({
       rWebui: "⚠️ 未找到 NapCat WebUI 配置或二维码文件（可在 ~/.dsh/qq-remote.json 设置 qrcodePath）",
       rStale: "⚠️ 二维码已过期，NapCat 正在重新生成…",
       rWaiting: "⏳ 等待二维码生成…（插件自动从 NapCat WebUI 获取，约 30-60 秒）",
-      bsTitle: "🧩 NapCat 引导（开箱即用）",
-      bsBtn: "一键安装/启动 NapCat",
-      bsBtn2: "重新应用 NapCat 服务（修复）",
-      bsBusy: "正在引导 NapCat（下载约 30MB，首次需几分钟）…",
-      bsDone: "✅ NapCat 已启动，等待二维码…",
-      bsFail: "一键安装/启动 NapCat",
-      bsStart: "引导已开始…",
-      dlTitle: "⬇️ NapCat 下载源",
-      dlHint: "下载约 29MB；国内网络慢可换镜像",
-      dlCustom: "自定义地址",
-      dlSave: "保存下载源",
-      dlSaved: "✅ 下载源已保存",
-      qqTitle: "🤖 机器人 QQ 号",
-      qqHint: "引导安装 NapCat 必需（用于 -q 快速登录生成二维码）",
-      qqPlaceholder: "填写机器人 QQ 号"
+
     };
     var en = {
       nav: "QQ Remote",
@@ -131,31 +117,16 @@ window.__ModuleLoader__.load({
       rWebui: "⚠️ NapCat WebUI config / qrcode file not found (set qrcodePath in ~/.dsh/qq-remote.json)",
       rStale: "⚠️ QR code expired, NapCat regenerating…",
       rWaiting: "⏳ Waiting for QR… (auto-fetch from NapCat WebUI, ~30-60s)",
-      bsTitle: "🧩 NapCat bootstrap (out-of-box)",
-      bsBtn: "Install / Start NapCat",
-      bsBtn2: "Re-apply NapCat service (fix)",
-      bsBusy: "Bootstrapping NapCat (~30MB download on first run)…",
-      bsDone: "✅ NapCat started, waiting for QR…",
-      bsFail: "Install / Start NapCat",
-      bsStart: "Bootstrap started…",
-      dlTitle: "⬇️ NapCat download source",
-      dlHint: "~29MB download; switch mirror if slow",
-      dlCustom: "Custom URL",
-      dlSave: "Save source",
-      dlSaved: "✅ Source saved",
-      qqTitle: "🤖 Bot QQ number",
-      qqHint: "Required for NapCat bootstrap (-q quick login)",
-      qqPlaceholder: "Enter bot QQ number"
+
     };
 
     // ── Section component ─────────────────────────────────────────────────
     function QqRemoteSection(props) {
       var t = props.t || function (k) { return zh[k] || k; };
-      var state = react.useState({ loading: true, loggedIn: false, ws: false, qr: false, busy: false, reason: "", bsBusy: false, bsSteps: [], msg: "", wl: [], wlInput: "", wlMsg: "", mirrors: [], dlId: "official", dlCustom: "", currentUrl: "", qq: "", bsRan: false });
+      var state = react.useState({ loading: true, loggedIn: false, ws: false, qr: false, busy: false, reason: "", msg: "", wl: [], wlInput: "", wlMsg: "" });
       var st = state[0];
       var set = state[1];
       var qrTimer = react.useRef(null);
-      var bsTimer = react.useRef(null);
       var polling = react.useRef(false);
 
       react.useEffect(function () {
@@ -191,16 +162,8 @@ window.__ModuleLoader__.load({
           } catch (e) {}
         };
         loadWl();
-        var loadDl = async function () {
-          try {
-            var r = await fetch("/qq-remote/napcat/settings");
-            var d = await r.json();
-            if (alive && Array.isArray(d.mirrors)) set(function (prev) { return Object.assign({}, prev, { mirrors: d.mirrors, dlId: d.currentId || "custom", dlCustom: d.currentId === "custom" ? d.current : "", currentUrl: d.current || "", qq: d.napcatQQ || "" }); });
-          } catch (e) {}
-        };
-        loadDl();
         var timer = setInterval(function () { load(); loadWl(); }, 4000);
-        return function () { alive = false; clearInterval(timer); if (qrTimer.current) clearInterval(qrTimer.current); if (bsTimer.current) clearInterval(bsTimer.current); };
+        return function () { alive = false; clearInterval(timer); if (qrTimer.current) clearInterval(qrTimer.current); };
       }, []);
 
       var relogin = async function () {
@@ -224,44 +187,25 @@ window.__ModuleLoader__.load({
         return { napcat_not_running: t("rNapcat"), webui_not_found: t("rWebui"), stale_qrcode: t("rStale") }[st.reason] || t("rWaiting");
       };
 
-      var saveDl = async function () {
-        var sel = (st.mirrors || []).filter(function (m) { return m.id === st.dlId; })[0];
-        var url = (sel && st.dlId !== "custom") ? sel.url : st.dlCustom.trim();
-        // 镜像列表未加载完时回退到服务端当前值（GET 返回的 current）
-        if (!url && st.currentUrl) url = st.currentUrl;
+      var relogin = async function () {
+        set(function (prev) { return Object.assign({}, prev, { busy: true, msg: t("waiting") }); });
         try {
-          var r = await fetch("/qq-remote/napcat/settings", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ url: url || "", napcatQQ: st.qq.trim() })
-          });
-          var j = await r.json();
-          set(function (prev) { return Object.assign({}, prev, { msg: j.ok ? t("dlSaved") : ("⚠️ " + (j.error || t("dlSaveFail"))) }); });
+          var r = await fetch("/qq-remote/relogin", { method: "POST" });
+          var j = await r.json().catch(function () { return null; });
+          if (j && j.ok === false) {
+            set(function (prev) { return Object.assign({}, prev, { busy: false, msg: "⚠️ " + j.message }); });
+            return;
+          }
         } catch (e) {}
+        polling.current = true;
+        qrTimer.current = setInterval(function () {
+          // 二维码过期刷新（img 带时间戳由 status 轮询触发）
+        }, 3000);
       };
 
-      var startBootstrap = async function () {
-        set(function (prev) { return Object.assign({}, prev, { bsBusy: true, bsSteps: [], bsRan: true }); });
-        try {
-          await fetch("/qq-remote/napcat/bootstrap", { method: "POST" });
-        } catch (e) {}
-        bsTimer.current = setInterval(async function () {
-          try {
-            var r = await fetch("/qq-remote/napcat/progress");
-            var j = await r.json();
-            if (j.running) {
-              set(function (prev) { return Object.assign({}, prev, { bsSteps: j.steps || [] }); });
-              return;
-            }
-            if (bsTimer.current) { clearInterval(bsTimer.current); bsTimer.current = null; }
-            set(function (prev) {
-              return Object.assign({}, prev, { bsBusy: false, bsSteps: j.steps || [], msg: j.ok ? t("bsDone") : (j.message || "") });
-            });
-          } catch (e) {
-            if (bsTimer.current) { clearInterval(bsTimer.current); bsTimer.current = null; }
-            set(function (prev) { return Object.assign({}, prev, { bsBusy: false }); });
-          }
-        }, 1500);
+      var reasonText = function () {
+        if (!st.reason || st.loggedIn || st.qr) return t("qrWaiting");
+        return { napcat_not_running: t("rNapcat"), webui_not_found: t("rWebui"), stale_qrcode: t("rStale") }[st.reason] || t("rWaiting");
       };
 
       var badge = function (ok, wait) {
@@ -297,53 +241,6 @@ window.__ModuleLoader__.load({
             ? h("img", { src: "/qq-remote/qrcode?t=" + Date.now(), alt: "QR" })
             : h("div", { className: "__qr_hint" }, reasonText()),
           h("div", { className: "__qr_hint" }, t("qrHint"))),
-        (!st.loggedIn && !st.loading)
-          ? h("div", { className: "__qr_group" }, t("bsTitle")) : null,
-        (!st.loggedIn && !st.loading)
-          ? h("button", {
-            className: "__qr_btn",
-            disabled: st.bsBusy,
-            onClick: startBootstrap
-          }, st.bsBusy ? t("bsBusy") : (st.bsRan ? t("bsBtn2") : t("bsBtn"))) : null,
-        (st.bsSteps && st.bsSteps.length > 0)
-          ? h("div", { className: "__qr_hint" }, (st.bsSteps || []).map(function (s) { return (s.ok ? "✅" : "⏳") + " " + s.step + " — " + s.message; }).join("\n")) : null,
-        (!st.loggedIn && !st.loading)
-          ? h("div", { className: "__qr_group" }, t("qqTitle")) : null,
-        (!st.loggedIn && !st.loading)
-          ? h("div", { className: "__qr_row" },
-            h("input", {
-              className: "__qr_input",
-              placeholder: t("qqPlaceholder"),
-              value: st.qq,
-              onChange: function (e) { set(function (prev) { return Object.assign({}, prev, { qq: e.target.value }); }); }
-            }),
-            h("span", { className: "__qr_label", style: { fontSize: "12px" } }, t("qqHint"))) : null,
-        (!st.loggedIn && !st.loading)
-          ? h("div", { className: "__qr_group" }, t("dlTitle")) : null,
-        (!st.loggedIn && !st.loading)
-          ? h("div", { className: "__qr_row" },
-            h("select", {
-              className: "__qr_input",
-              style: { width: "100%" },
-              value: st.dlId || "official",
-              onChange: function (e) { set(function (prev) { return Object.assign({}, prev, { dlId: e.target.value }); }); }
-            },
-              (st.mirrors || []).map(function (m) {
-                return h("option", { key: m.id, value: m.id }, m.name);
-              }),
-              h("option", { key: "custom", value: "custom" }, t("dlCustom")))) : null,
-        (!st.loggedIn && !st.loading && st.dlId === "custom")
-          ? h("div", { className: "__qr_row" },
-            h("input", {
-              className: "__qr_input",
-              placeholder: "https://…/NapCat.Shell.zip",
-              value: st.dlCustom,
-              onChange: function (e) { set(function (prev) { return Object.assign({}, prev, { dlCustom: e.target.value }); }); }
-            })) : null,
-        (!st.loggedIn && !st.loading)
-          ? h("div", { className: "__qr_row" },
-            h("button", { className: "__qr_btn", onClick: saveDl }, t("dlSave")),
-            h("span", { className: "__qr_label", style: { fontSize: "12px" } }, t("dlHint"))) : null,
         h("div", { className: "__qr_msg" }, st.msg || t("intro")),
         h("div", { className: "__qr_group" }, t("wlTitle")),
         h("div", { className: "__qr_hint" }, t("wlHint")),

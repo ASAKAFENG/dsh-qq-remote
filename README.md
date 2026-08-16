@@ -2,6 +2,13 @@
 
 装上这个插件，你的 QQ 就能变成 DSH 的遥控器：出门在外用手机发条消息就能让电脑干活 —— 派任务、跑命令、看进度、收截图；想聊天时它又能变成陪你闲聊的 AI 搭子。登录失效不用折腾命令行，打开设置面板扫码即恢复。
 
+> ⚠️ **前置依赖（必装）**：本插件**不包含 QQ 协议实现**，需要先安装并运行 **NapCat**（或 Lagrange.OneBot / go-cqhttp / LLOneBot 等 OneBot 11 实现）作为 QQ 桥。NapCat 未运行时插件无法收发 QQ 消息，面板会显示"NapCat 未启动"。
+>
+> **NapCat 与插件联动三步**：
+> 1. 安装 NapCat（Linux：https://im.qq.com/linuxqq 装 QQ 后用 NapCat 官方脚本注入，或用 NapCat.Shell；Windows/macOS 用官方安装包），启动并**手机扫码登录**机器人 QQ
+> 2. 打开 NapCat WebUI（默认 `http://127.0.0.1:6099/webui`）→ 网络配置 → 新增 **WebSocket 服务端**：监听 `127.0.0.1:3001`（路径 `/ws`，消息格式 array）——与插件默认 `wsUrl` 一致
+> 3. 启动 DSH + 插件后，DSH 设置页「QQ 远程」面板会显示"已连接"；若 NapCat 登录失效，面板可直接扫码恢复
+
 > 💡 **安装提示**：直接把这个仓库链接发给你的 AI 编程助手（Codex、Claude Code 等），它能按本 README 自行完成安装与配置。
 
 （技术说明：纯 JS 实现、零额外依赖；通过 OneBot 11 协议对接 NapCat / Lagrange.OneBot / go-cqhttp / LLOneBot 等主流 QQ 机器人框架。）
@@ -22,7 +29,6 @@
 | 截图回传 | `/screenshot` | 截屏（xdg-desktop-portal / grim / scrot…）并以图片消息发送 |
 | Agent 主动汇报 | `qq_report` `qq_screenshot` | agent 在会话里可主动向 QQ 发送文本 / 截图 |
 | QQ 图形开关 | `/panel` + 设置页「QQ 远程」 | 实时状态、一键重新登录、登录失效自动弹出二维码扫码恢复 |
-| 🧩 开箱即用 | 面板「一键安装/启动 NapCat」 | NapCat 缺失时自动下载安装 + 写 OneBot 配置 + 注册 systemd 服务 + 启动，扫码即用 |
 | 一键安装 | `scripts/install.sh` | 自动构建 + npm 依赖 + 装配注册，跨平台自包含 |
 
 ## 命令一览
@@ -56,7 +62,7 @@
 | 平台 | Linux 完整支持；macOS / Windows 核心功能可用（见下） |
 
 **平台支持情况：**
-- ✅ **已在 Ubuntu 环境验证安装通过**（一键安装脚本、插件市场 cordis-plugin 安装管线、NapCat 引导、扫码登录全链路均实测可用）
+- ✅ **已在 Ubuntu 环境验证安装通过**（一键安装脚本、插件市场 cordis-plugin 安装管线、与 NapCat 联动、扫码登录全链路均实测可用）
 - ⚠️ **macOS / Windows**：`/exec` 需环境提供 bash（如 WSL / Git Bash）；截图需在 `screenshotCommand` 配置本平台工具（如 macOS `screencapture -x <path>`），否则 `/screenshot` 不可用
 
 ## 安装与配置
@@ -107,11 +113,9 @@ bash scripts/install.sh
 
 1. **配置白名单**：通过设置里面的 QQ远程 来配置 或者 `~/.dsh/qq-remote.json`，把 `allowedUsers` 改成你的 QQ 号（默认示例 `[123456789]` 会放行任意消息，务必替换）
 2. **重启 DSH** 让插件加载生效（或热重载）
-3. **准备 NapCat**（QQ 协议桥，插件需要它才能收发消息）：
-   - 已有 NapCat：确认它在运行（DSH 设置页「QQ 远程」面板会显示连接状态）
-   - 没有 NapCat：打开 `http://127.0.0.1:3080/qq-remote/panel` → 点「一键安装/启动 NapCat」→ 自动下载配置启动（下载慢可先切镜像）
-4. **扫码登录**：面板出现二维码后用手机 QQ 扫码授权（2 分钟有效，自动刷新；扫码是 QQ 安全机制，无法跳过）
-5. **验证打通**：用你的 QQ 号给机器人发 `/ping` → 回复 `pong` 即成功；发 `/help` 查看全部命令
+3. **确保 NapCat 已安装并运行**（前置依赖，见文首"NapCat 与插件联动三步"）：NapCat WebUI 里配好 `127.0.0.1:3001` 的 WebSocket 服务端并已扫码登录机器人 QQ
+4. **验证打通**：DSH 设置页「QQ 远程」面板显示"已连接"，用你的 QQ 号给机器人发 `/ping` → 回复 `pong` 即成功；发 `/help` 查看全部命令
+5. **登录失效恢复**：面板出现二维码后用手机 QQ 扫码授权（2 分钟有效，自动刷新；扫码是 QQ 安全机制，无法跳过）
 6. **常用命令**：
 
 | 想做什么 | 发什么 |
@@ -152,6 +156,14 @@ node test/onebot-mock.mjs 3001
 - **安装/引导 NapCat 很慢？** 引导需要从 GitHub 下载约 29MB 的 NapCat.Shell，国内网络可能需数分钟——面板会实时显示下载进度。嫌慢可：① 手动下载 `NapCat.Shell.zip` 放到 `~/.dsh/NapCat.Shell.zip`（检测到即跳过下载）；② 在 `~/.dsh/qq-remote.json` 配置 `napcatDownloadUrl` 指向镜像或本地文件。
 
 ## 更新日志
+
+### v0.3.15（2026-08-16）—— 移除一键引导，回归"前置依赖 NapCat"模式
+
+- 🗑️ **移除一键引导功能**：不再自动下载/安装/配置 NapCat（引导模块 `napcat.js` 及面板按钮、下载源、机器人 QQ 号输入全部移除）——插件回归纯远程控制职责，NapCat 由用户自行安装（README 摘要给出前置依赖提醒与联动三步）
+- 📖 README 摘要新增 **"前置依赖（必装）"** 提醒：NapCat 与插件联动三步（装 NapCat + 扫码 → WebUI 配 3001 WebSocket 服务端 → 面板显示已连接）
+- 🧹 代码精简：移除 napcat.js 模块（约 400 行）、3 个配置项、4 个面板路由、引导 UI 区块
+- 🧪 e2e 精简为 17 用例（保留诊断/二维码/消息链路）
+
 
 ### v0.3.14（2026-08-16）—— 修复 launcher 引导：NAPCAT_BOOTMAIN 层级错误
 

@@ -14,7 +14,6 @@ import { createChat } from "../chat.js";
 import { createCommands } from "../commands.js";
 import { qrToPng } from "../qrgen.js";
 import { classifyQrReason } from "../panel.js";
-import { createNapcat, serviceTemplateLinux } from "../napcat.js";
 import { WebSocketServer } from "ws";
 
 const sent = [];
@@ -117,43 +116,13 @@ check("qrToPng 生成 PNG", png && png.subarray(0, 8).toString("hex") === "89504
 
 // ── qrReason 诊断分类（四类场景） ─────────────────────────────
 check("无 NapCat → napcat_not_running", classifyQrReason({ ok: false, loggedIn: false, serviceActive: false, webuiAvailable: false, qrFileExists: false, qrFileFresh: false }) === "napcat_not_running");
-check("unit 存在但 inactive → napcat_not_running（引导按钮显示）", classifyQrReason({ ok: false, loggedIn: false, serviceActive: false, webuiAvailable: true, qrFileExists: false, qrFileFresh: false }) === "napcat_not_running");
+check("unit 存在但 inactive → napcat_not_running", classifyQrReason({ ok: false, loggedIn: false, serviceActive: false, webuiAvailable: true, qrFileExists: false, qrFileFresh: false }) === "napcat_not_running");
 check("服务运行无 webui → webui_not_found", classifyQrReason({ ok: false, loggedIn: false, serviceActive: true, webuiAvailable: false, qrFileExists: false, qrFileFresh: false }) === "webui_not_found");
 check("旧二维码 → stale_qrcode", classifyQrReason({ ok: false, loggedIn: false, serviceActive: true, webuiAvailable: true, qrFileExists: true, qrFileFresh: false }) === "stale_qrcode");
 check("一切就绪等生成 → waiting", classifyQrReason({ ok: false, loggedIn: false, serviceActive: true, webuiAvailable: true, qrFileExists: false, qrFileFresh: false }) === "waiting");
 check("二维码就绪 → 空 reason", classifyQrReason({ ok: true, loggedIn: false, serviceActive: true, webuiAvailable: true, qrFileExists: false, qrFileFresh: false }) === "");
-check("服务停 + 残留二维码 → napcat_not_running（死码不骗人）", classifyQrReason({ ok: true, loggedIn: false, serviceActive: false, webuiAvailable: true, qrFileExists: true, qrFileFresh: true }) === "napcat_not_running");
+check("服务停 + 残留二维码 → napcat_not_running", classifyQrReason({ ok: true, loggedIn: false, serviceActive: false, webuiAvailable: true, qrFileExists: true, qrFileFresh: true }) === "napcat_not_running");
 check("已登录 → 空 reason", classifyQrReason({ ok: false, loggedIn: true, serviceActive: false, webuiAvailable: false, qrFileExists: false, qrFileFresh: false }) === "");
-
-// ── NapCat 引导模块可加载 ─────────────────────────────────────
-const nap = createNapcat({ config, log: ctx.logger });
-check("napcat 模块导出 detect/bootstrap", typeof nap.detect === "function" && typeof nap.bootstrap === "function");
-
-// ── Linux launcher 服务模板 ──────────────────────────────────
-const lu = serviceTemplateLinux("/tmp/napcat-linux", "/opt/QQ/qq", "/tmp/napcat");
-check("launcher 模板含 LD_PRELOAD", /LD_PRELOAD=\/tmp\/napcat-linux\/libnapcat_launcher/.test(lu));
-check("launcher 模板 NAPCAT_BOOTMAIN 指向安装目录", lu.includes("NAPCAT_BOOTMAIN=/tmp/napcat"));
-check("launcher 模板 WorkingDirectory 指向安装目录", lu.includes("WorkingDirectory=/tmp/napcat"));
-check("launcher 模板不含 -q", !lu.includes(" -q "));
-check("launcher 模板用 QQ 宿主", lu.includes("/opt/QQ/qq --no-sandbox"));
-
-// ── bootstrap 防顶号：已有活跃服务 → 跳过并返回 ok ────────────
-const bsGuard = await nap.bootstrap(3001);
-check("bootstrap 防顶号（有活跃服务 → ok:true 跳过）", bsGuard.ok === true && /无需引导|已在运行/.test(bsGuard.steps[0]?.message ?? ""));
-
-// ── bootstrap 错误路径（下载失败应返回结构化错误而非崩溃） ────
-const origFetch = globalThis.fetch;
-globalThis.fetch = async () => ({ ok: false, status: 404 });
-const origInstallDir = config.napcatInstallDir;
-config.napcatInstallDir = "/tmp/dsh-e2e-napcat-empty";
-try {
-  fs.rmSync(config.napcatInstallDir, { recursive: true, force: true });
-} catch {}
-const bs = await nap.bootstrap(3001, { skipActiveCheck: true });
-check("bootstrap 下载失败 → ok:false", bs.ok === false);
-check("bootstrap 无 dirname 崩溃", !/dirname/.test(bs.message ?? "") && bs.steps.every((s) => !/dirname/.test(s.message ?? "")));
-globalThis.fetch = origFetch;
-config.napcatInstallDir = origInstallDir;
 
 wss.close();
 console.log(`\n结果: ${pass} PASS / ${fail} FAIL`);

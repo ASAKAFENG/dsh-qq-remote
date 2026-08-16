@@ -8,11 +8,12 @@ cd "$ROOT"
 
 echo "=== Assembling lib/ (index.js + modules + client.js → lib/) ==="
 mkdir -p lib
+rm -f lib/napcat.js
 cp index.js lib/index.js
 cp qrgen.js lib/qrgen.js
-cp util.js onebot.js chat.js commands.js panel.js napcat.js lib/
+cp util.js onebot.js chat.js commands.js panel.js lib/
 cp client.js lib/client.js 2>/dev/null || true
-for f in index.js qrgen.js util.js onebot.js chat.js commands.js panel.js napcat.js client.js; do
+for f in index.js qrgen.js util.js onebot.js chat.js commands.js panel.js client.js; do
   if [ -f "lib/$f" ]; then node --check "lib/$f"; fi
 done
 

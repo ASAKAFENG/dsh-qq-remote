@@ -22,13 +22,14 @@ fi
 # 1. 构建（纯拷贝源码 → lib/，无编译依赖）
 echo "[1/5] 构建插件…"
 mkdir -p "$ROOT/lib"
+rm -f "$ROOT/lib/napcat.js"
 cp "$ROOT/index.js" "$ROOT/lib/index.js"
 cp "$ROOT/qrgen.js" "$ROOT/lib/qrgen.js"
-for m in util.js onebot.js chat.js commands.js panel.js napcat.js; do
+for m in util.js onebot.js chat.js commands.js panel.js; do
   cp "$ROOT/$m" "$ROOT/lib/$m" 2>/dev/null || true
 done
 if [ -f "$ROOT/client.js" ]; then cp "$ROOT/client.js" "$ROOT/lib/client.js"; fi
-for f in index.js qrgen.js util.js onebot.js chat.js commands.js panel.js napcat.js; do
+for f in index.js qrgen.js util.js onebot.js chat.js commands.js panel.js; do
   node --check "$ROOT/lib/$f" || { echo "错误: lib/$f 语法检查失败" >&2; exit 1; }
 done
 test -f "$ROOT/lib/client.js" || { echo "错误: lib/client.js 缺失（前端 bundle 必需）" >&2; exit 1; }
@@ -167,8 +168,7 @@ if [ ! -f "$CFG" ]; then
   "chatMaxChars": 0,
   "chatSessionNames": [],
   "qrcodePath": "",
-  "napcatServiceName": "napcat-qq",
-  "napcatDownloadUrl": ""
+  "napcatServiceName": "napcat-qq"
 }
 CFGEOF
   echo "      已生成 $CFG（⚠️ 请把 allowedUsers 改成你的 QQ 号）"
