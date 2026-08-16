@@ -89,6 +89,8 @@ export const Config = z.object({
   webuiToken: z.string().default(""),
   /** NapCat 的 systemd 用户服务名（面板"重新登录"用它重启）。 */
   napcatServiceName: z.string().default("napcat-qq"),
+  /** NapCat 安装目录（引导自动安装时的目标；留空 = 自动探测 ~/.dsh/napcat 等）。 */
+  napcatInstallDir: z.string().default(""),
 });
 
 export function apply(ctx, config) {
@@ -131,6 +133,9 @@ export function apply(ctx, config) {
     phaseState: null,
     /** 长任务心跳定时器。 */
     heartbeatTimer: null,
+    /** NapCat 引导状态（面板轮询）。 */
+    napcatBusy: false,
+    napcatProgress: null,
     /** 模块实例（装配顺序：bot → chat → cmds → panel）。 */
     bot: null,
     chat: null,

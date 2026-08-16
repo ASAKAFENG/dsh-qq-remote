@@ -1,16 +1,40 @@
 /**
- * dsh-qq-remote — QQ 图形开关面板：状态 / 重新登录 / 二维码自动获取 / 白名单。
+ * dsh-qq-remote — QQ 图形开关面板：状态 / 重新登录 / 二维码自动获取 / 白名单 / NapCat 引导。
  * 工厂函数 createPanel(state)。
- * 二维码获取三层：NapCat WebUI API（自动读 webui.json）→ 文件探测 → systemd NAPCAT_WORKDIR 反推。
+ * 二维码获取：WebUI API（自动读 webui.json，带缓存与失败退避）→ 文件探测 → systemd/NAPCAT_WORKDIR//proc 反推。
+ * 诊断：qrReason 区分 napcat_not_running / webui_not_found / stale_qrcode / waiting。
  */
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { qrToPng } from "./qrgen.js";
 import { runProcess } from "./util.js";
+import { createNapcat, SVC_NAME } from "./napcat.js";
+
+/** QR 诊断分类（纯函数，便于测试）。 */
+export function classifyQrReason({ ok, loggedIn, serviceExists, webuiAvailable, qrFileExists, qrFileFresh }) {
+  if (ok) return "";
+  if (loggedIn) return "";
+  if (serviceExists === false) return "napcat_not_running";
+  if (qrFileExists && !qrFileFresh) return "stale_qrcode";
+  if (!webuiAvailable) return "webui_not_found";
+  return "waiting";
+}
+
+/** 二维码文件是否新鲜（10 分钟内）。 */
+function qrFresh(p) {
+  try {
+    return Date.now() - fs.statSync(p).mtimeMs < 10 * 60 * 1000;
+  } catch {
+    return false;
+  }
+}
 
 export function createPanel(state) {
   const { ctx, config, log } = state;
+  /** NapCat 引导模块（检测/安装/配置/服务）。 */
+  const napcat = createNapcat(state);
+  state.napcat = napcat;
 
   /** NapCat config 目录候选（webui.json 所在处；由 writePath 推导）。 */
   const WEBUI_JSON_CANDIDATES = () => {
@@ -23,6 +47,7 @@ export function createPanel(state) {
       path.join(home, "napcat"),
       "/opt/napcat",
       path.join(home, ".config", "QQ", "NapCat"),
+      path.join(home, ".config", "napcat"),
       path.join(home, "Library", "Application Support", "QQ", "NapCat"),
     ];
     return writePaths.map((d) => path.join(d, "config", "webui.json"));
@@ -35,6 +60,33 @@ export function createPanel(state) {
       const r = await runProcess("systemctl", ["--user", "show", svc, "-p", "Environment"], { timeout: 5000 });
       const m = String(r.out ?? "").match(/NAPCAT_WORKDIR=([^\s]+)/);
       if (m && m[1]) return m[1];
+    } catch {}
+    return null;
+  }
+
+  /** Linux /proc 反推：napcat 进程的 cwd / environ 里的 NAPCAT_WORKDIR。 */
+  function workdirFromProc() {
+    if (process.platform !== "linux") return null;
+    try {
+      for (const name of fs.readdirSync("/proc")) {
+        if (!/^\d+$/.test(name)) continue;
+        let cmdline = "";
+        try {
+          cmdline = fs.readFileSync(`/proc/${name}/cmdline`, "utf8");
+        } catch {
+          continue;
+        }
+        if (!cmdline.toLowerCase().includes("napcat")) continue;
+        let env = "";
+        try {
+          env = fs.readFileSync(`/proc/${name}/environ`, "utf8");
+        } catch {}
+        const m = env.match(/NAPCAT_WORKDIR=([^\0]+)/);
+        if (m && m[1]) return m[1];
+        try {
+          return fs.readlinkSync(`/proc/${name}/cwd`);
+        } catch {}
+      }
     } catch {}
     return null;
   }
@@ -55,6 +107,7 @@ export function createPanel(state) {
       "/opt/QQNT/resources/app/napcat/cache/qrcode.png",
       path.join(home, ".config", "QQ", "NapCat", "cache", "qrcode.png"),
       path.join(home, ".config", "QQ", "NapCat", "data", "cache", "qrcode.png"),
+      path.join(home, ".config", "napcat", "cache", "qrcode.png"),
       path.join(home, "Library", "Application Support", "QQ", "NapCat", "cache", "qrcode.png"),
     ];
     // 由 webui.json 的 config 位置反推 writePath/cache/qrcode.png
@@ -65,10 +118,11 @@ export function createPanel(state) {
     return list;
   };
 
+  /** 返回新鲜的二维码文件路径（过期文件不算）。 */
   function findQrcode() {
     for (const p of QR_CANDIDATES()) {
       try {
-        if (fs.existsSync(p) && Date.now() - fs.statSync(p).mtimeMs < 10 * 60 * 1000) return p;
+        if (fs.existsSync(p) && qrFresh(p)) return p;
       } catch {}
     }
     return null;
@@ -85,6 +139,36 @@ export function createPanel(state) {
         if (d && d.token) return { port: d.port || port, token: d.token, prefix: "" };
       } catch {}
     }
+    return null;
+  }
+
+  /** 查找 NapCat systemd 用户服务：配置值 → 插件托管服务 → 扫描含 napcat 的 unit。 */
+  let svcCache = null;
+  let svcCacheAt = 0;
+  async function findNapcatServiceName() {
+    if (svcCache && Date.now() - svcCacheAt < 30000) return svcCache;
+    const preferred = config.napcatServiceName || "napcat-qq";
+    for (const cand of [preferred, SVC_NAME]) {
+      try {
+        const r = await runProcess("systemctl", ["--user", "is-active", cand], { timeout: 5000 });
+        if (String(r.out ?? "").trim() === "active") {
+          svcCache = cand;
+          svcCacheAt = Date.now();
+          return cand;
+        }
+      } catch {}
+    }
+    try {
+      const r = await runProcess("systemctl", ["--user", "list-unit-files", "--no-legend", "--no-pager"], { timeout: 8000 });
+      const m = String(r.out ?? "").match(/^(\S*napcat\S*\.service)\s/m);
+      if (m && m[1]) {
+        svcCache = m[1];
+        svcCacheAt = Date.now();
+        return m[1];
+      }
+    } catch {}
+    svcCache = null;
+    svcCacheAt = Date.now();
     return null;
   }
 
@@ -151,27 +235,39 @@ export function createPanel(state) {
     return qrToPng(url, { scale: 4, margin: 4 });
   }
 
-  /** 二维码获取总入口：WebUI API 优先 → 文件探测回退。返回 PNG buffer 或 null。 */
+  /** 二维码获取总入口：带 5s 结果缓存 + WebUI 失败 10s 退避（避免轮询触发登录限流）。 */
+  let qrFetchCache = null; // { at, buf }
+  let webuiFailUntil = 0;
   async function fetchQrcode() {
-    // 已登录无需二维码（避免无谓的 WebUI 探测与登录限流）
-    if (await state.bot.qqLoggedIn().catch(() => false)) return null;
-    const buf = await fetchQrcodeViaWebui();
-    if (buf) return buf;
+    if (qrFetchCache && Date.now() - qrFetchCache.at < 5000) return qrFetchCache.buf;
+    // 已登录无需二维码
+    if (await state.bot.qqLoggedIn().catch(() => false)) {
+      qrFetchCache = { at: Date.now(), buf: null };
+      return null;
+    }
+    let buf = null;
+    if (Date.now() >= webuiFailUntil) {
+      buf = await fetchQrcodeViaWebui();
+      if (!buf) webuiFailUntil = Date.now() + 10000; // 失败退避
+    }
     const p = findQrcode();
-    if (p) {
+    if (!buf && p) {
       try {
-        return fs.readFileSync(p);
+        buf = fs.readFileSync(p);
       } catch {}
     }
-    // systemd 服务自定义 NAPCAT_WORKDIR 的最后一次机会
-    const wd = await workdirFromSystemd();
-    if (wd) {
-      const p2 = path.join(wd, "cache", "qrcode.png");
-      try {
-        if (fs.existsSync(p2) && Date.now() - fs.statSync(p2).mtimeMs < 10 * 60 * 1000) return fs.readFileSync(p2);
-      } catch {}
+    if (!buf) {
+      // systemd NAPCAT_WORKDIR / /proc 反推的最后机会
+      const wd = (await workdirFromSystemd().catch(() => null)) ?? workdirFromProc();
+      if (wd) {
+        const p2 = path.join(wd, "cache", "qrcode.png");
+        try {
+          if (fs.existsSync(p2) && qrFresh(p2)) buf = fs.readFileSync(p2);
+        } catch {}
+      }
     }
-    return null;
+    qrFetchCache = { at: Date.now(), buf };
+    return buf;
   }
 
   /** 读取白名单（配置 overlay 的 allowedUsers）。 */
@@ -213,7 +309,7 @@ export function createPanel(state) {
 <title>QQ 远程控制 · DSH</title>
 <style>
   body{background:#0f1420;color:#e8eaf0;font-family:system-ui,-apple-system,sans-serif;margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center}
-  .card{background:#171e2e;border:1px solid #26304a;border-radius:16px;padding:32px 36px;width:min(420px,92vw);box-shadow:0 12px 40px rgba(0,0,0,.4)}
+  .card{background:#171e2e;border:1px solid #26304a;border-radius:16px;padding:32px 36px;width:min(440px,92vw);box-shadow:0 12px 40px rgba(0,0,0,.4)}
   h1{font-size:20px;margin:0 0 4px;display:flex;align-items:center;gap:8px}
   .sub{color:#8b93a7;font-size:13px;margin-bottom:20px}
   .row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #222c44;font-size:14px}
@@ -223,10 +319,13 @@ export function createPanel(state) {
   button{width:100%;margin-top:18px;padding:12px;border:none;border-radius:10px;background:#4d6bfe;color:#fff;font-size:15px;font-weight:600;cursor:pointer}
   button:hover{background:#5b77ff}button:disabled{background:#2a3350;color:#6b7280;cursor:not-allowed}
   button.danger{background:#b91c1c}button.danger:hover{background:#dc2626}
+  button.green{background:#15803d}button.green:hover{background:#16a34a}
   #qrwrap{display:none;margin-top:18px;text-align:center}
   #qrwrap img{width:240px;height:240px;border-radius:12px;background:#fff;padding:10px}
-  #qrhint{color:#8b93a7;font-size:12px;margin-top:8px}
-  #log{color:#64748b;font-size:12px;margin-top:14px;min-height:16px}
+  #qrhint{color:#8b93a7;font-size:12px;margin-top:8px;white-space:pre-line}
+  #log{color:#64748b;font-size:12px;margin-top:14px;min-height:16px;white-space:pre-line}
+  #bootstrap{margin-top:16px;border-top:1px solid #222c44;padding-top:14px;display:none}
+  #bsteps{font-size:12px;color:#8b93a7;margin-top:10px;white-space:pre-line}
 </style></head><body>
 <div class="card">
   <h1>🤖 QQ 远程控制</h1>
@@ -235,11 +334,17 @@ export function createPanel(state) {
   <div class="row"><span>QQ 登录状态</span><span id="st-qq" class="badge wait">检测中…</span></div>
   <button id="btn" disabled>检测中…</button>
   <div id="qrwrap"><img id="qr" alt="登录二维码"><div id="qrhint"></div></div>
+  <div id="bootstrap">
+    <div class="sub" style="margin-bottom:8px">🧩 NapCat 引导（开箱即用）</div>
+    <button id="btn-bs" class="green">一键安装/启动 NapCat</button>
+    <div id="bsteps"></div>
+  </div>
   <div id="log"></div>
 </div>
 <script>
 const $=id=>document.getElementById(id);
 let polling=false, qrTimer=null;
+const REASON={napcat_not_running:'⚠️ NapCat 未启动——点下方「一键安装/启动 NapCat」，或先启动你的 NapCat 服务',webui_not_found:'⚠️ 未找到 NapCat WebUI 配置或二维码文件（可在 ~/.dsh/qq-remote.json 设置 qrcodePath）',stale_qrcode:'⚠️ 二维码已过期，NapCat 正在重新生成…',waiting:'⏳ 等待二维码生成…（插件自动从 NapCat WebUI 获取，约 30-60 秒）'};
 async function refresh(){
   try{
     const r=await fetch('/qq-remote/status');const s=await r.json();
@@ -248,10 +353,15 @@ async function refresh(){
     $('st-qq').textContent=s.loggedIn?'已登录':'未登录';
     $('st-qq').className='badge '+(s.loggedIn?'ok':'bad');
     const b=$('btn');
-    b.disabled=false;
-    if(s.loggedIn){b.textContent='✅ QQ 已登录（需要重登点这里）';b.className='';}
+    b.disabled=false;b.className='';
+    if(s.loggedIn){b.textContent='✅ QQ 已登录（需要重登点这里）';}
     else if(s.qrAvailable){b.textContent='🔄 重新登录（二维码已就绪）';b.className='danger';}
     else{b.textContent='🔄 重新登录（弹出二维码）';b.className='danger';}
+    // NapCat 引导区：仅未登录时显示
+    const bs=$('bootstrap');
+    if(!s.loggedIn&&s.qrReason==='napcat_not_running'){bs.style.display='block';}
+    else{bs.style.display='none';}
+    $('qrhint').textContent=(!s.loggedIn&&s.qrReason&&REASON[s.qrReason])?REASON[s.qrReason]:'手机 QQ 扫码授权（二维码约 2 分钟有效，过期自动刷新）';
     if(polling&&s.qrAvailable)showQr();
     if(polling&&s.loggedIn){stopPoll();log('✅ 登录成功');}
     if(!s.loggedIn&&s.qrAvailable)showQr();
@@ -260,16 +370,33 @@ async function refresh(){
 function showQr(){
   $('qrwrap').style.display='block';
   $('qr').src='/qq-remote/qrcode?t='+Date.now();
-  $('qrhint').textContent='手机 QQ 扫码授权（二维码约 2 分钟有效，过期自动刷新）';
 }
 function stopPoll(){polling=false;clearInterval(qrTimer);}
 $('btn').onclick=async()=>{
   const b=$('btn');b.disabled=true;b.textContent='正在重启 NapCat…';
   log('触发重新登录…');
-  try{await fetch('/qq-remote/relogin',{method:'POST'});}catch(e){}
+  try{const r=await fetch('/qq-remote/relogin',{method:'POST'});const j=await r.json();
+    if(j&&j.ok===false){log('⚠️ '+j.message);b.disabled=false;b.textContent='🔄 重新登录';return;}}
+  catch(e){}
   log('等待二维码/自动登录…（NapCat 重启中，约 30-60 秒）');
   $('qrwrap').style.display='none';
   polling=true;qrTimer=setInterval(refresh,3000);
+};
+$('btn-bs').onclick=async()=>{
+  const b=$('btn-bs');b.disabled=true;b.textContent='正在引导 NapCat（下载约 30MB，首次需几分钟）…';
+  $('bsteps').textContent='';
+  try{await fetch('/qq-remote/napcat/bootstrap',{method:'POST'});}catch(e){}
+  const t=setInterval(async()=>{
+    try{
+      const r=await fetch('/qq-remote/napcat/progress');const j=await r.json();
+      if(j.running){$('bsteps').textContent=(j.steps||[]).map(s=>(s.ok?'✅':'⏳')+' '+s.step+' — '+s.message).join('\n');return;}
+      clearInterval(t);
+      $('bsteps').textContent=(j.steps||[]).map(s=>(s.ok?'✅':'❌')+' '+s.step+' — '+s.message).join('\n');
+      b.disabled=false;
+      if(j.ok){b.textContent='✅ NapCat 已启动，等待二维码…';refresh();}
+      else{b.textContent='一键安装/启动 NapCat';}
+    }catch(e){clearInterval(t);b.disabled=false;b.textContent='一键安装/启动 NapCat';}
+  },1500);
 };
 refresh();setInterval(refresh,5000);
 </script></body></html>`;
@@ -298,24 +425,44 @@ refresh();setInterval(refresh,5000);
     ctx.effect(() => webServer.register({
       kind: "exact", path: "/qq-remote/status",
       handler: async (_req, res) => {
-        const [loggedIn, qr] = await Promise.all([
+        const [loggedIn, qrBuf] = await Promise.all([
           state.bot.qqLoggedIn().catch(() => false),
           fetchQrcode().catch(() => null),
         ]);
+        const svc = await findNapcatServiceName();
+        const qrPath = findQrcode();
+        const webui = findWebuiConfig();
+        const reason = classifyQrReason({
+          ok: Boolean(qrBuf),
+          loggedIn,
+          serviceExists: svc != null,
+          webuiAvailable: webui != null,
+          qrFileExists: qrPath != null,
+          qrFileFresh: qrPath ? qrFresh(qrPath) : false,
+        });
         json(res, {
           loggedIn,
           wsConnected: Boolean(state.ws && state.ws.readyState === WebSocket.OPEN),
-          qrAvailable: Boolean(qr),
-          qrReason: qr ? "" : "waiting",
+          qrAvailable: Boolean(qrBuf),
+          qrReason: reason,
+          napcatService: svc,
         });
       },
     }), "qq-remote: status");
     ctx.effect(() => webServer.register({
       kind: "exact", path: "/qq-remote/relogin",
       handler: async (_req, res) => {
-        json(res, { ok: true });
+        // 先确认 NapCat 服务存在，不存在则返回真实失败原因（不假装成功）
+        const svc = await findNapcatServiceName();
+        if (!svc) {
+          json(res, {
+            ok: false,
+            message: `未找到 NapCat systemd 用户服务（默认 ${config.napcatServiceName || "napcat-qq"}.service）。请先启动 NapCat，或点面板「一键安装/启动 NapCat」，或在 ~/.dsh/qq-remote.json 配置 napcatServiceName / qrcodePath。`,
+          });
+          return;
+        }
+        json(res, { ok: true, message: `正在重启 ${svc}…` });
         // 后台重启 NapCat：登录态有效则快速登录自动恢复，失效则自动进入二维码模式
-        const svc = config.napcatServiceName || "napcat-qq";
         runProcess("systemctl", ["--user", "restart", svc], { timeout: 15000 }).catch(() => {});
       },
     }), "qq-remote: relogin");
@@ -355,6 +502,35 @@ refresh();setInterval(refresh,5000);
         json(res, { ok: false, error: "method not allowed" });
       },
     }), "qq-remote: whitelist");
+    // ── NapCat 引导（开箱即用） ────────────────────────────────
+    ctx.effect(() => webServer.register({
+      kind: "exact", path: "/qq-remote/napcat",
+      handler: async (_req, res) => {
+        const detected = await napcat.detect().catch(() => null);
+        json(res, { detected, qrReason: "napcat_not_running" });
+      },
+    }), "qq-remote: napcat");
+    ctx.effect(() => webServer.register({
+      kind: "exact", path: "/qq-remote/napcat/bootstrap",
+      handler: async (_req, res) => {
+        if (state.napcatBusy) {
+          json(res, { ok: false, message: "引导已在运行中" });
+          return;
+        }
+        state.napcatBusy = true;
+        state.napcatProgress = { running: true, steps: [], ok: false };
+        json(res, { ok: true, message: "引导已开始" });
+        const result = await napcat.bootstrap().catch((e) => ({ ok: false, message: String(e.message ?? e), steps: [] }));
+        state.napcatProgress = { running: false, ...result };
+        state.napcatBusy = false;
+      },
+    }), "qq-remote: napcat/bootstrap");
+    ctx.effect(() => webServer.register({
+      kind: "exact", path: "/qq-remote/napcat/progress",
+      handler: async (_req, res) => {
+        json(res, state.napcatProgress ?? { running: false, steps: [], ok: false });
+      },
+    }), "qq-remote: napcat/progress");
     state.panelRegistered = true;
   }
 

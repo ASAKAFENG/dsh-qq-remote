@@ -22,6 +22,7 @@
 | 截图回传 | `/screenshot` | 截屏（xdg-desktop-portal / grim / scrot…）并以图片消息发送 |
 | Agent 主动汇报 | `qq_report` `qq_screenshot` | agent 在会话里可主动向 QQ 发送文本 / 截图 |
 | QQ 图形开关 | `/panel` + 设置页「QQ 远程」 | 实时状态、一键重新登录、登录失效自动弹出二维码扫码恢复 |
+| 🧩 开箱即用 | 面板「一键安装/启动 NapCat」 | NapCat 缺失时自动下载安装 + 写 OneBot 配置 + 注册 systemd 服务 + 启动，扫码即用 |
 | 一键安装 | `scripts/install.sh` | 自动构建 + npm 依赖 + 装配注册，跨平台自包含 |
 
 ## 命令一览
@@ -155,6 +156,16 @@ node test/onebot-mock.mjs 3001
 - 建议通过 NapCat 使用小号/机器人号，避免主号被风控
 
 ## 更新日志
+
+### v0.3.2（2026-08-16）—— 开箱即用：NapCat 引导 + 二维码诊断
+
+- 🧩 **一键安装 NapCat**：面板新增「一键安装/启动 NapCat」—— 自动下载官方 NapCat.Shell → 解压 → 幂等写入 OneBot11 反向 WS 配置（3001）→ 注册 systemd 用户服务 `dsh-napcat.service` → 启动 → 二维码自动出现，扫码即登录
+- 🔍 **二维码诊断分级**：`/qq-remote/status` 现在区分 `napcat_not_running` / `webui_not_found` / `stale_qrcode` / `waiting`，设置页与完整面板直接显示原因，不再无限"等待"
+- ❌ **重新登录不再假装成功**：NapCat 服务缺失时返回真实错误（含修复指引），前端恢复按钮并显示原因
+- ⚡ **轮询优化**：QR 获取 5s 结果缓存 + WebUI 失败 10s 退避（避免登录限流）
+- 🧭 探测增强：`/proc/<pid>/cwd` 与 `NAPCAT_WORKDIR` 反推 NapCat 工作目录；`~/.config/napcat` 等路径补充
+- 🧪 e2e 回归扩至 16 用例（含四类 qrReason 诊断场景）
+
 
 ### v0.3.1（2026-08-16）—— 对齐插件市场 STANDARD 规范
 

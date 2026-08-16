@@ -12,6 +12,8 @@ import { createBot } from "../onebot.js";
 import { createChat } from "../chat.js";
 import { createCommands } from "../commands.js";
 import { qrToPng } from "../qrgen.js";
+import { classifyQrReason } from "../panel.js";
+import { createNapcat } from "../napcat.js";
 import { WebSocketServer } from "ws";
 
 const sent = [];
@@ -111,6 +113,18 @@ check("未授权用户被忽略", after === before);
 // ── QR 生成器（无需 jsqr 也验证 PNG 魔数） ────────────────────
 const png = qrToPng("https://txz.qq.com/p?k=test", { scale: 4, margin: 4 });
 check("qrToPng 生成 PNG", png && png.subarray(0, 8).toString("hex") === "89504e470d0a1a0a");
+
+// ── qrReason 诊断分类（四类场景） ─────────────────────────────
+check("无 NapCat → napcat_not_running", classifyQrReason({ ok: false, loggedIn: false, serviceExists: false, webuiAvailable: false, qrFileExists: false, qrFileFresh: false }) === "napcat_not_running");
+check("有服务无 webui → webui_not_found", classifyQrReason({ ok: false, loggedIn: false, serviceExists: true, webuiAvailable: false, qrFileExists: false, qrFileFresh: false }) === "webui_not_found");
+check("旧二维码 → stale_qrcode", classifyQrReason({ ok: false, loggedIn: false, serviceExists: true, webuiAvailable: true, qrFileExists: true, qrFileFresh: false }) === "stale_qrcode");
+check("一切就绪等生成 → waiting", classifyQrReason({ ok: false, loggedIn: false, serviceExists: true, webuiAvailable: true, qrFileExists: false, qrFileFresh: false }) === "waiting");
+check("二维码就绪 → 空 reason", classifyQrReason({ ok: true, loggedIn: false, serviceExists: true, webuiAvailable: true, qrFileExists: false, qrFileFresh: false }) === "");
+check("已登录 → 空 reason", classifyQrReason({ ok: false, loggedIn: true, serviceExists: true, webuiAvailable: false, qrFileExists: false, qrFileFresh: false }) === "");
+
+// ── NapCat 引导模块可加载 ─────────────────────────────────────
+const nap = createNapcat({ config, log: ctx.logger });
+check("napcat 模块导出 detect/bootstrap", typeof nap.detect === "function" && typeof nap.bootstrap === "function");
 
 wss.close();
 console.log(`\n结果: ${pass} PASS / ${fail} FAIL`);
