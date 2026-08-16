@@ -93,6 +93,8 @@ export const Config = z.object({
   napcatInstallDir: z.string().default(""),
   /** NapCat.Shell 下载地址（默认官方 GitHub Release；网络慢可换镜像或本地 file:// 路径）。 */
   napcatDownloadUrl: z.string().default(""),
+  /** 机器人 QQ 号（引导自动安装时写入服务启动参数 -q，用于快速登录/生成二维码）。 */
+  napcatQQ: z.string().default(""),
 });
 
 export function apply(ctx, config) {
