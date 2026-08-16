@@ -159,6 +159,13 @@ node test/onebot-mock.mjs 3001
 
 ## 更新日志
 
+### v0.3.6（2026-08-16）—— 设置面板可配置 NapCat 下载源
+
+- ⬇️ **下载源可选项**：设置页「QQ 远程」面板新增「NapCat 下载源」—— 官方 GitHub / gh-proxy.com 镜像 / ghfast.top 镜像 / 自定义地址，一键切换并保存（写入 `~/.dsh/qq-remote.json` 即时生效）
+- 🔧 后端 `GET/POST /qq-remote/napcat/settings`：镜像列表单一事实源，支持自定义 URL 校验（http/https/file）
+- 🧪 e2e 21 用例保持全过
+
+
 ### v0.3.5（2026-08-16）—— 引导下载体验：实时进度 + 镜像支持
 
 - ⚡ **实时下载进度**：引导面板显示「下载中 xMB / 29MB（x%）」，不再干等

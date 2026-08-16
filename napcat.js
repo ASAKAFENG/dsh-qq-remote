@@ -16,6 +16,12 @@ import { runProcess } from "./util.js";
 
 /** NapCat.Shell 官方下载地址（latest 标签跟随最新版）。 */
 const SHELL_ZIP_URL = "https://github.com/NapNeko/NapCatQQ/releases/latest/download/NapCat.Shell.zip";
+/** 预置下载源（设置面板可选）。 */
+export const NAPCAT_MIRRORS = [
+  { id: "official", name: "官方 GitHub", url: SHELL_ZIP_URL },
+  { id: "ghproxy", name: "gh-proxy.com 镜像", url: "https://gh-proxy.com/https://github.com/NapNeko/NapCatQQ/releases/latest/download/NapCat.Shell.zip" },
+  { id: "ghfast", name: "ghfast.top 镜像", url: "https://ghfast.top/https://github.com/NapNeko/NapCatQQ/releases/latest/download/NapCat.Shell.zip" },
+];
 const SHELL_ZIP = "NapCat.Shell.zip";
 /** 插件管理的安装目录（默认 ~/.dsh/napcat；可用 napcatInstallDir 覆盖）。 */
 const DEFAULT_INSTALL_DIR = () => path.join(os.homedir(), ".dsh", "napcat");
