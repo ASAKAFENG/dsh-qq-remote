@@ -27,7 +27,7 @@ import z from "@deepseek-ai/schemastery";
 /** Cordis 插件名。 */
 export const name = "qq-remote";
 /** 声明注入的服务（tools 必用；agents/sessions 走 ctx.get 可选访问）。 */
-export const inject = ["tools"];
+export const inject = ["tools", "webServer"];
 
 /** 插件配置。 */
 export const Config = z.object({
@@ -342,6 +342,8 @@ export function apply(ctx, config) {
   let watchdogTimer = null;
   /** 最近一次 WebSocket 创建时间（用于判定 CONNECTING 卡死）。 */
   let wsCreatedAt = 0;
+  /** 面板路由是否已注册（防重试重复注册）。 */
+  let panelRegistered = false;
 
   // ── OneBot 连接 ────────────────────────────────────────────────
   function connect() {
@@ -1419,6 +1421,33 @@ export function apply(ctx, config) {
     return null;
   }
 
+  /** 读取白名单（配置 overlay 的 allowedUsers）。 */
+  function readWhitelist() {
+    try {
+      const p = path.join(os.homedir(), ".dsh", "qq-remote.json");
+      if (!fs.existsSync(p)) return config.allowedUsers ?? [];
+      const d = JSON.parse(fs.readFileSync(p, "utf8"));
+      return Array.isArray(d.allowedUsers) ? d.allowedUsers : (config.allowedUsers ?? []);
+    } catch {
+      return config.allowedUsers ?? [];
+    }
+  }
+
+  /** 写入白名单（merge 进 overlay，保留其他字段），并热更新内存 config。 */
+  function writeWhitelist(list) {
+    const clean = [...new Set(list.map((n) => Number(n)).filter((n) => Number.isInteger(n) && n > 0))];
+    const p = path.join(os.homedir(), ".dsh", "qq-remote.json");
+    try {
+      const d = fs.existsSync(p) ? JSON.parse(fs.readFileSync(p, "utf8")) : {};
+      d.allowedUsers = clean;
+      fs.writeFileSync(p, JSON.stringify(d, null, 2));
+    } catch (e) {
+      log.warn(`[qq-remote] 白名单写入失败: ${e.message}`);
+    }
+    config.allowedUsers = clean;
+    return clean;
+  }
+
   async function qqLoggedIn() {
     try {
       const info = await api("get_login_info", {}, 5000);
@@ -1504,7 +1533,16 @@ refresh();setInterval(refresh,5000);
 
   function registerQqPanel() {
     const webServer = ctx.get("webServer");
-    if (!webServer) return;
+    if (!webServer) {
+      // 防御：webServer 服务未就绪时延迟重试，避免静默丢失路由
+      log.warn("[qq-remote] webServer 未就绪，1s 后重试注册面板路由…");
+      setTimeout(() => {
+        if (disposed) return;
+        registerQqPanel();
+      }, 1000);
+      return;
+    }
+    if (panelRegistered) return; // 已注册过（重试路径）
     ctx.effect(() => webServer.register({
       kind: "exact", path: "/qq-remote/panel",
       handler: async (_req, res) => {
@@ -1548,6 +1586,30 @@ refresh();setInterval(refresh,5000);
         res.end(fs.readFileSync(p));
       },
     }), "qq-remote: qrcode");
+    ctx.effect(() => webServer.register({
+      kind: "exact", path: "/qq-remote/whitelist",
+      handler: async (req, res) => {
+        if (req.method === "GET") {
+          json(res, { allowedUsers: readWhitelist() });
+          return;
+        }
+        if (req.method === "POST") {
+          let body = "";
+          for await (const chunk of req) body += chunk;
+          try {
+            const parsed = JSON.parse(body || "{}");
+            const list = Array.isArray(parsed.allowedUsers) ? parsed.allowedUsers : [];
+            const clean = writeWhitelist(list);
+            json(res, { ok: true, allowedUsers: clean });
+          } catch (e) {
+            json(res, { ok: false, error: String(e.message ?? e) });
+          }
+          return;
+        }
+        json(res, { ok: false, error: "method not allowed" });
+      },
+    }), "qq-remote: whitelist");
+    panelRegistered = true;
   }
 
   // ── 装配 ──────────────────────────────────────────────────────

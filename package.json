@@ -1,6 +1,6 @@
 {
   "name": "@dsh-external/dsh-qq-remote",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "通过 QQ 消息远程控制 DeepSeek Harness：命令执行(/exec)、任务派发(/ask)、阶段进度汇报、屏幕截图发送(/screenshot)、AI 聊天(/chat)与聊天特化会话(/chatbind)、会话标题化管理(/newsession /title /session)。OneBot 11(NapCat/Lagrange/go-cqhttp)，零 npm 依赖。",
   "type": "module",
   "main": "./lib/index.js",

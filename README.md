@@ -154,6 +154,11 @@ node test/onebot-mock.mjs 3001
 
 ## 更新日志
 
+### v0.2.2（2026-08-16）—— 面板路由修复 + 白名单 UI
+
+- 🐛 **修复面板路由不注册**：注册条目补 `inject: [webServer, tools]`（cordis.patch.yml / install.sh 模板）；插件代码增加 webServer 未就绪的延迟重试 + 防重复注册 —— 通过 `dsh plugin` 官方安装后 `/qq-remote/*` 路由必定注册
+- ✨ **设置页新增白名单管理**：「QQ 远程」面板可增删控制白名单（QQ 号）并保存到 `~/.dsh/qq-remote.json`，即时生效
+
 ### v0.2.1（2026-08-16）—— 安装可靠性修复（社区评审驱动）
 
 **安装/卸载**

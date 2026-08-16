@@ -86,6 +86,7 @@ if stripped in ("", "[]"):
 entry = ("\n- insert:\n"
          "    - id: " + pkg_id + "\n"
          "      name: '" + pkg_name + "'\n"
+         "      inject: [webServer, tools]\n"
          "      config: {}\n")
 # 清理悬挂子行（历史残留：父块被删的 name:/config: 等）
 cleaned = []

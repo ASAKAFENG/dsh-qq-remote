@@ -33,6 +33,8 @@ window.__ModuleLoader__.load({
       ".__qr_qr img{width:220px;height:220px;border-radius:12px;background:#fff;padding:8px}" +
       ".__qr_hint{font-size:12px;color:var(--dsw-alias-label-tertiary);margin-top:8px}" +
       ".__qr_msg{font-size:12px;color:var(--dsw-alias-label-tertiary);min-height:16px;margin-top:6px}" +
+      ".__qr_group{font-size:13px;font-weight:700;color:var(--dsw-alias-label-primary);border-bottom:1px solid var(--dsw-alias-border-l2);padding-bottom:4px;margin:10px 0 2px}" +
+      ".__qr_input{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-3);font:inherit;color:var(--dsw-alias-label-primary);border-radius:8px;padding:6px 10px;font-size:13px;box-sizing:border-box;width:100%}" +
       ".__qr_link{font-size:12px;color:var(--dsw-alias-state-business-primary);text-decoration:none}" +
       ".__qr_unavailable{font-size:13px;color:var(--dsw-alias-label-tertiary)}";
     var tagId = "dsh-qq-remote/main.css";
@@ -66,7 +68,15 @@ window.__ModuleLoader__.load({
       panel: "打开完整控制面板 →",
       failed: "状态获取失败",
       unavailable: "服务端未注册 dsh-qq-remote？",
-      done: "✅ 登录成功"
+      done: "✅ 登录成功",
+      wlTitle: "控制白名单",
+      wlHint: "允许通过 QQ 控制本机的 QQ 号（留空=任何人都能控制，危险）",
+      wlAdd: "添加",
+      wlRemove: "删除",
+      wlSave: "保存白名单",
+      wlSaved: "✅ 白名单已保存",
+      wlSaveFail: "保存失败",
+      wlInputPlaceholder: "输入 QQ 号"
     };
     var en = {
       nav: "QQ Remote",
@@ -87,13 +97,21 @@ window.__ModuleLoader__.load({
       panel: "Open full panel →",
       failed: "Status fetch failed",
       unavailable: "dsh-qq-remote not registered server-side?",
-      done: "✅ Login success"
+      done: "✅ Login success",
+      wlTitle: "Control whitelist",
+      wlHint: "QQ numbers allowed to control (empty = anyone, dangerous)",
+      wlAdd: "Add",
+      wlRemove: "Remove",
+      wlSave: "Save whitelist",
+      wlSaved: "✅ Whitelist saved",
+      wlSaveFail: "Save failed",
+      wlInputPlaceholder: "Enter QQ number"
     };
 
     // ── Section component ─────────────────────────────────────────────────
     function QqRemoteSection(props) {
       var t = props.t || function (k) { return zh[k] || k; };
-      var state = react.useState({ loading: true, loggedIn: false, ws: false, qr: false, busy: false, msg: "" });
+      var state = react.useState({ loading: true, loggedIn: false, ws: false, qr: false, busy: false, msg: "", wl: [], wlInput: "", wlMsg: "" });
       var st = state[0];
       var set = state[1];
       var qrTimer = react.useRef(null);
@@ -124,7 +142,15 @@ window.__ModuleLoader__.load({
           }
         };
         load();
-        var timer = setInterval(load, 4000);
+        var loadWl = async function () {
+          try {
+            var r = await fetch("/qq-remote/whitelist");
+            var w = await r.json();
+            if (alive && Array.isArray(w.allowedUsers)) set(function (prev) { return Object.assign({}, prev, { wl: w.allowedUsers }); });
+          } catch (e) {}
+        };
+        loadWl();
+        var timer = setInterval(function () { load(); loadWl(); }, 4000);
         return function () { alive = false; clearInterval(timer); if (qrTimer.current) clearInterval(qrTimer.current); };
       }, []);
 
@@ -171,6 +197,56 @@ window.__ModuleLoader__.load({
           h("img", { src: "/qq-remote/qrcode?t=" + Date.now(), alt: "QR" }),
           h("div", { className: "__qr_hint" }, t("qrHint"))),
         h("div", { className: "__qr_msg" }, st.msg || t("intro")),
+        h("div", { className: "__qr_group" }, t("wlTitle")),
+        h("div", { className: "__qr_hint" }, t("wlHint")),
+        st.wl.map(function (uin) {
+          return h("div", { key: uin, className: "__qr_row" },
+            h("span", { className: "__qr_label" }, String(uin)),
+            h("button", {
+              className: "__qr_btn",
+              onClick: function () {
+                set(function (prev) {
+                  var wl = prev.wl.filter(function (x) { return x !== uin; });
+                  return Object.assign({}, prev, { wl: wl });
+                });
+              }
+            }, t("wlRemove")));
+        }),
+        h("div", { className: "__qr_row" },
+          h("input", {
+            className: "__qr_input",
+            placeholder: t("wlInputPlaceholder"),
+            value: st.wlInput,
+            onChange: function (e) { set(function (prev) { return Object.assign({}, prev, { wlInput: e.target.value }); }); }
+          }),
+          h("button", {
+            className: "__qr_btn",
+            onClick: function () {
+              var v = parseInt(st.wlInput.trim(), 10);
+              if (!v) return;
+              set(function (prev) {
+                var wl = prev.wl.indexOf(v) >= 0 ? prev.wl : prev.wl.concat([v]);
+                return Object.assign({}, prev, { wl: wl, wlInput: "" });
+              });
+            }
+          }, t("wlAdd"))),
+        h("button", {
+          className: "__qr_btn",
+          onClick: async function () {
+            try {
+              var r = await fetch("/qq-remote/whitelist", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ allowedUsers: st.wl })
+              });
+              var j = await r.json();
+              set(function (prev) { return Object.assign({}, prev, { wlMsg: j.ok ? t("wlSaved") : t("wlSaveFail") }); });
+            } catch (e) {
+              set(function (prev) { return Object.assign({}, prev, { wlMsg: t("wlSaveFail") }); });
+            }
+          }
+        }, t("wlSave")),
+        h("div", { className: "__qr_msg" }, st.wlMsg || ""),
         h("a", { className: "__qr_link", href: "/qq-remote/panel", target: "_blank" }, t("panel"))
       );
     }
