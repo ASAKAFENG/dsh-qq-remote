@@ -153,6 +153,13 @@ node test/onebot-mock.mjs 3001
 
 ## 更新日志
 
+### v0.3.14（2026-08-16）—— 修复 launcher 引导：NAPCAT_BOOTMAIN 层级错误
+
+- 🐛 **根因**：launcher 的 `loadNapCat.js` 加载 `${NAPCAT_BOOTMAIN}/napcat.mjs`，但服务把 `NAPCAT_BOOTMAIN` 指向了 launcher 目录（`~/.dsh/napcat-linux`）——实际 `napcat.mjs` 在 `napcat/` 子目录（符号链接）里 → `ERR_MODULE_NOT_FOUND`
+- 🔧 **修复**：`NAPCAT_BOOTMAIN` 与 `WorkingDirectory` 直接指向 NapCat 实际根目录（`~/.dsh/napcat`），`LD_PRELOAD` 仍指向 launcher 的 so
+- 🧪 e2e 扩至 26 用例（BOOTMAIN/WorkingDirectory 指向安装目录）
+
+
 ### v0.3.13（2026-08-16）—— 二维码过期自动刷新（不再显示死码）
 
 - 🐛 **根因**：二维码约 2 分钟有效，但插件 10 分钟内都视为"新鲜"——过期旧码一直显示，扫码提示失效

@@ -130,9 +130,10 @@ const nap = createNapcat({ config, log: ctx.logger });
 check("napcat 模块导出 detect/bootstrap", typeof nap.detect === "function" && typeof nap.bootstrap === "function");
 
 // ── Linux launcher 服务模板 ──────────────────────────────────
-const lu = serviceTemplateLinux("/home/test/.dsh/napcat-linux", "/opt/QQ/qq");
+const lu = serviceTemplateLinux("/home/test/.dsh/napcat-linux", "/opt/QQ/qq", "/home/test/.dsh/napcat");
 check("launcher 模板含 LD_PRELOAD", /LD_PRELOAD=\/home\/test\/\.dsh\/napcat-linux\/libnapcat_launcher/.test(lu));
-check("launcher 模板含 NAPCAT_BOOTMAIN", lu.includes("NAPCAT_BOOTMAIN=/home/test/.dsh/napcat-linux"));
+check("launcher 模板 NAPCAT_BOOTMAIN 指向安装目录", lu.includes("NAPCAT_BOOTMAIN=/home/test/.dsh/napcat"));
+check("launcher 模板 WorkingDirectory 指向安装目录", lu.includes("WorkingDirectory=/home/test/.dsh/napcat"));
 check("launcher 模板不含 -q", !lu.includes(" -q "));
 check("launcher 模板用 QQ 宿主", lu.includes("/opt/QQ/qq --no-sandbox"));
 

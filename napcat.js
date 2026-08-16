@@ -85,9 +85,12 @@ export async function ensureLinuxLauncher(installDir) {
   return dir;
 }
 
-/** Linux launcher 模式 systemd 服务模板（无需 -q：QQ 内核随宿主启动即进入登录流程）。 */
-export function serviceTemplateLinux(launcherDir, qqPath) {
-  const home = os.homedir();
+/**
+ * Linux launcher 模式 systemd 服务模板（无需 -q：QQ 内核随宿主启动即进入登录流程）。
+ * 注意：launcher 的 loadNapCat.js 加载 ${NAPCAT_BOOTMAIN}/napcat.mjs ——
+ *       NAPCAT_BOOTMAIN 必须指向 NapCat 实际根目录（installDir），不是 launcher 目录！
+ */
+export function serviceTemplateLinux(launcherDir, qqPath, installDir) {
   return `[Unit]
 Description=NapCat.Shell (managed by dsh-qq-remote, Linux launcher)
 After=graphical-session.target network.target
@@ -95,8 +98,8 @@ After=graphical-session.target network.target
 [Service]
 Type=simple
 Environment=DISPLAY=:0
-Environment=NAPCAT_BOOTMAIN=${launcherDir}
-WorkingDirectory=${launcherDir}
+Environment=NAPCAT_BOOTMAIN=${installDir}
+WorkingDirectory=${installDir}
 ExecStart=/usr/bin/env LD_PRELOAD=${path.join(launcherDir, LAUNCHER_SO(process.arch))} ${qqPath} --no-sandbox
 Restart=on-failure
 RestartSec=5
@@ -357,8 +360,8 @@ export function createNapcat(state, deps = {}) {
       let svcDesc;
       if (linuxQQ) {
         const launcherDir = await ensureLinuxLauncher(dir);
-        unit = serviceTemplateLinux(launcherDir, linuxQQ);
-        svcDesc = `systemd 服务 ${SVC_NAME} 已注册（Linux launcher → ${linuxQQ}）`;
+        unit = serviceTemplateLinux(launcherDir, linuxQQ, dir);
+        svcDesc = `systemd 服务 ${SVC_NAME} 已注册（Linux launcher → ${linuxQQ}，BOOTMAIN=${dir}）`;
       } else if (process.platform === "linux") {
         push("service", false, "未找到 Linux QQ 宿主（需要 /opt/QQ/qq）。NapCat.Shell 依赖 QQ NTQQ 运行，请先安装 Linux QQ（https://im.qq.com/linuxqq 下载 deb 安装），然后重新引导。");
         return { ok: false, message: "缺少 Linux QQ 宿主", steps };
