@@ -1404,9 +1404,12 @@ export function apply(ctx, config) {
     const home = os.homedir();
     const list = [
       path.join(home, "napcat", "cache", "qrcode.png"),
+      path.join(home, "NapCat", "cache", "qrcode.png"),
+      path.join(home, ".local", "share", "napcat", "cache", "qrcode.png"),
       "/opt/QQ/resources/app/napcat/cache/qrcode.png",
       "/opt/QQNT/resources/app/napcat/cache/qrcode.png",
       path.join(home, ".config", "QQ", "NapCat", "cache", "qrcode.png"),
+      path.join(home, ".config", "QQ", "NapCat", "data", "cache", "qrcode.png"),
     ];
     if (config.qrcodePath) list.unshift(config.qrcodePath);
     return list;

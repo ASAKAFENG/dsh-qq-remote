@@ -76,13 +76,42 @@ import re, sys, os
 path, pkg_id, pkg_name = sys.argv[1], sys.argv[2], sys.argv[3]
 with open(path, encoding="utf-8") as f:
     content = f.read()
+# 清理 1：空 `- insert:` 块（无子列表的顶层条目）
+lines = content.split("\n")
+cleaned_lines = []
+i = 0
+while i < len(lines):
+    line = lines[i]
+    if re.match(r'^\s*- insert:\s*$', line):
+        j = i + 1
+        # 收集该块后续缩进子行
+        sub = []
+        while j < len(lines) and (lines[j].strip() == "" or (len(lines[j]) - len(lines[j].lstrip()) > 0)):
+            if lines[j].strip() != "":
+                sub.append(lines[j])
+            j += 1
+        if len(sub) == 0:
+            i = j  # 空 insert 块：丢弃
+            continue
+    cleaned_lines.append(line)
+    i += 1
+content = "\n".join(cleaned_lines)
+
 # 幂等：已存在该 id 的条目块（精确匹配行首，注释/说明不会误命中）
-if re.search(r'^\s*- id:\s*' + re.escape(pkg_id) + r'\s*$', content, re.M):
-    sys.exit(0)
+existing = re.search(r'^\s*- id:\s*' + re.escape(pkg_id) + r'\s*$', content, re.M)
 # 顶层 [] 模板 / 空文件 → 以列表重建
 stripped = content.strip()
 if stripped in ("", "[]"):
     content = ""
+if existing:
+    # 已存在：也把清理后的内容写回（修复历史残留），然后退出
+    new_content = content
+    if new_content != open(path, encoding="utf-8").read():
+        tmp = path + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            f.write(new_content)
+        os.replace(tmp, path)
+    sys.exit(0)
 entry = ("\n- insert:\n"
          "    - id: " + pkg_id + "\n"
          "      name: '" + pkg_name + "'\n"

@@ -76,7 +76,8 @@ window.__ModuleLoader__.load({
       wlSave: "保存白名单",
       wlSaved: "✅ 白名单已保存",
       wlSaveFail: "保存失败",
-      wlInputPlaceholder: "输入 QQ 号"
+      wlInputPlaceholder: "输入 QQ 号",
+      qrWaiting: "⏳ 等待二维码生成（NapCat 重启后约 30-60 秒）…若持续没有，请在配置里设置 qrcodePath 指向 NapCat 的 qrcode.png"
     };
     var en = {
       nav: "QQ Remote",
@@ -125,10 +126,9 @@ window.__ModuleLoader__.load({
             var s = await r.json();
             if (!alive) return;
             set(function (prev) {
-              var next = {
-                loading: false, loggedIn: !!s.loggedIn, ws: !!s.wsConnected, qr: !!s.qrAvailable,
-                busy: prev.busy, msg: prev.msg
-              };
+              var next = Object.assign({}, prev, {
+                loading: false, loggedIn: !!s.loggedIn, ws: !!s.wsConnected, qr: !!s.qrAvailable
+              });
               if (polling.current && s.qrAvailable) next.msg = "";
               if (polling.current && s.loggedIn) {
                 polling.current = false;
@@ -138,7 +138,7 @@ window.__ModuleLoader__.load({
               return next;
             });
           } catch (e) {
-            if (alive) set({ loading: false, loggedIn: false, ws: false, qr: false, busy: false, msg: t("failed") + "（服务未就绪，自动重试中…）" });
+            if (alive) set(function (prev) { return Object.assign({}, prev, { loading: false, loggedIn: false, ws: false, qr: false, msg: t("failed") + "（服务未就绪，自动重试中…）" }); });
           }
         };
         load();
@@ -155,7 +155,7 @@ window.__ModuleLoader__.load({
       }, []);
 
       var relogin = async function () {
-        set({ loading: false, loggedIn: st.loggedIn, ws: st.ws, qr: st.qr, busy: true, msg: t("waiting") });
+        set(function (prev) { return Object.assign({}, prev, { busy: true, msg: t("waiting") }); });
         try {
           await fetch("/qq-remote/relogin", { method: "POST" });
         } catch (e) {}
@@ -192,14 +192,16 @@ window.__ModuleLoader__.load({
         }, btnLabel),
         h("div", {
           className: "__qr_qr",
-          style: { display: (!st.loggedIn && st.qr && !st.loading) ? "block" : "none" }
+          style: { display: (!st.loggedIn && !st.loading) ? "block" : "none" }
         },
-          h("img", { src: "/qq-remote/qrcode?t=" + Date.now(), alt: "QR" }),
+          st.qr
+            ? h("img", { src: "/qq-remote/qrcode?t=" + Date.now(), alt: "QR" })
+            : h("div", { className: "__qr_hint" }, t("qrWaiting")),
           h("div", { className: "__qr_hint" }, t("qrHint"))),
         h("div", { className: "__qr_msg" }, st.msg || t("intro")),
         h("div", { className: "__qr_group" }, t("wlTitle")),
         h("div", { className: "__qr_hint" }, t("wlHint")),
-        st.wl.map(function (uin) {
+        (st.wl || []).map(function (uin) {
           return h("div", { key: uin, className: "__qr_row" },
             h("span", { className: "__qr_label" }, String(uin)),
             h("button", {
