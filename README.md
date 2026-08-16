@@ -153,6 +153,15 @@ node test/onebot-mock.mjs 3001
 
 ## 更新日志
 
+### v0.3.12（2026-08-16）—— Linux 引导修复：NapCat 经 launcher 注入 QQ 宿主
+
+- 🐛 **根因**：NapCat.Shell 在 Linux 上不是独立程序，`node napcat.mjs` 直启会失败（`--no-sandbox` 传给 node / 找不到 QQ 资源）
+- 🔧 **Linux launcher 模式**：引导自动下载官方预编译 `libnapcat_launcher.so`（按架构）→ 建立 `~/.dsh/napcat-linux/`（含 napcat 符号链接）→ 服务改为 `LD_PRELOAD=launcher /opt/QQ/qq --no-sandbox` + `NAPCAT_BOOTMAIN`
+- ✨ **Linux 下无需填写 QQ 号**：QQ 内核随宿主启动即进入登录流程，二维码直接生成
+- ❌ 找不到 Linux QQ（/opt/QQ/qq）时明确报错并提示安装（不再用 node 硬启）
+- 🧪 e2e 扩至 25 用例（launcher 模板/宿主/LD_PRELOAD）
+
+
 ### v0.3.11（2026-08-16）—— 修复 QQ 号保存失效
 
 - 🐛 **根因**：设置页保存按钮在镜像列表未加载完时，URL 计算出空值直接 return——**QQ 号根本没提交**（静默丢弃）

@@ -31,6 +31,83 @@ export const SVC_NAME = "dsh-napcat.service";
 /** 候选启动入口（解压后探测）。 */
 const ENTRY_CANDIDATES = ["main.mjs", "napcat.mjs", "napcat.js", "main.js", "index.mjs"];
 
+// ── Linux：NapCat.Shell 不是独立程序，需经 libnapcat_launcher.so 注入 QQ NTQQ 宿主 ──
+/** Linux QQ 可执行文件候选路径。 */
+const LINUX_QQ_PATHS = ["/opt/QQ/qq", "/opt/QQNT/qq", "/usr/lib/qq/qq"];
+/** launcher 预编译产物下载地址（按架构）。 */
+const LAUNCHER_RELEASE = "https://github.com/NapNeko/napcat-linux-launcher/releases/download/1.0.1";
+const LAUNCHER_SO = (arch) => `libnapcat_launcher_${arch === "arm64" ? "arm64" : "amd64"}.so`;
+
+/** 探测 Linux QQ 宿主（NapCat.Shell 依赖它运行）。 */
+export function findLinuxQQ() {
+  if (process.platform !== "linux") return null;
+  for (const p of LINUX_QQ_PATHS) {
+    try {
+      if (fs.existsSync(p)) return p;
+    } catch {}
+  }
+  return null;
+}
+
+/** Linux launcher 工作目录：~/.dsh/napcat-linux/{libnapcat_launcher.so, napcat->installDir}。 */
+function linuxLauncherDir() {
+  return path.join(os.homedir(), ".dsh", "napcat-linux");
+}
+
+/** 准备 launcher：下载预编译 so（按架构）+ 建 napcat 符号链接指向安装目录。 */
+export async function ensureLinuxLauncher(installDir) {
+  const dir = linuxLauncherDir();
+  fs.mkdirSync(dir, { recursive: true });
+  const soPath = path.join(dir, LAUNCHER_SO(process.arch));
+  const linkName = path.join(dir, "napcat");
+  // 1) launcher so
+  if (!fs.existsSync(soPath) || fs.statSync(soPath).size < 10000) {
+    const url = `${LAUNCHER_RELEASE}/${LAUNCHER_SO(process.arch)}`;
+    const res = await fetch(url, { signal: AbortSignal.timeout(120000), redirect: "follow" });
+    if (!res.ok) throw new Error(`launcher 下载失败: HTTP ${res.status}`);
+    const buf = Buffer.from(await res.arrayBuffer());
+    if (buf.length < 10000) throw new Error("launcher 下载内容异常（文件过小）");
+    const tmp = soPath + ".tmp";
+    fs.writeFileSync(tmp, buf);
+    fs.renameSync(tmp, soPath);
+  }
+  // 2) napcat -> installDir 符号链接
+  try {
+    if (fs.readlinkSync(linkName) !== installDir) {
+      fs.unlinkSync(linkName);
+      fs.symlinkSync(installDir, linkName);
+    }
+  } catch {
+    try {
+      fs.symlinkSync(installDir, linkName);
+    } catch {}
+  }
+  return dir;
+}
+
+/** Linux launcher 模式 systemd 服务模板（无需 -q：QQ 内核随宿主启动即进入登录流程）。 */
+export function serviceTemplateLinux(launcherDir, qqPath) {
+  const home = os.homedir();
+  return `[Unit]
+Description=NapCat.Shell (managed by dsh-qq-remote, Linux launcher)
+After=graphical-session.target network.target
+
+[Service]
+Type=simple
+Environment=DISPLAY=:0
+Environment=NAPCAT_BOOTMAIN=${launcherDir}
+WorkingDirectory=${launcherDir}
+ExecStart=/usr/bin/env LD_PRELOAD=${path.join(launcherDir, LAUNCHER_SO(process.arch))} ${qqPath} --no-sandbox
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=15
+KillMode=mixed
+
+[Install]
+WantedBy=default.target
+`;
+}
+
 /** 需要确保存在的 OneBot11 反向配置（插入 target 的 ws 端口）。 */
 function onebotEntry(port) {
   return {
@@ -273,11 +350,28 @@ export function createNapcat(state, deps = {}) {
       mergeOnebotConfig(dir, wsPort);
       push("config", true, `OneBot11 反向 WS ws://127.0.0.1:${wsPort} 已确保`);
       // 3) 注册 systemd 服务
-      const entryFile = findEntry(dir);
-      const qq = (config.napcatQQ || "").trim();
+      //    Linux：NapCat.Shell 需经 launcher 注入 QQ NTQQ 宿主（QQ 内核随宿主启动即进登录流程，无需 -q）
+      //    其他平台：node 直启（NapCat.Shell 独立运行）
+      const linuxQQ = findLinuxQQ();
+      let unit;
+      let svcDesc;
+      if (linuxQQ) {
+        const launcherDir = await ensureLinuxLauncher(dir);
+        unit = serviceTemplateLinux(launcherDir, linuxQQ);
+        svcDesc = `systemd 服务 ${SVC_NAME} 已注册（Linux launcher → ${linuxQQ}）`;
+      } else if (process.platform === "linux") {
+        push("service", false, "未找到 Linux QQ 宿主（需要 /opt/QQ/qq）。NapCat.Shell 依赖 QQ NTQQ 运行，请先安装 Linux QQ（https://im.qq.com/linuxqq 下载 deb 安装），然后重新引导。");
+        return { ok: false, message: "缺少 Linux QQ 宿主", steps };
+      } else {
+        const entryFile = findEntry(dir);
+        const qq = (config.napcatQQ || "").trim();
+        unit = serviceTemplate(dir, entryFile, qq);
+        svcDesc = qq
+          ? `systemd 服务 ${SVC_NAME} 已注册（QQ ${qq} 快速登录）`
+          : `systemd 服务 ${SVC_NAME} 已注册（未配置 QQ 号，WebUI 模式）`;
+      }
       const unitPath = path.join(os.homedir(), ".config", "systemd", "user", SVC_NAME);
       fs.mkdirSync(path.dirname(unitPath), { recursive: true });
-      const unit = serviceTemplate(dir, entryFile, qq);
       const unitChanged = !fs.existsSync(unitPath) || fs.readFileSync(unitPath, "utf8") !== unit;
       if (unitChanged) {
         const tmp = unitPath + ".tmp";
@@ -286,10 +380,8 @@ export function createNapcat(state, deps = {}) {
       }
       await runProcess("systemctl", ["--user", "daemon-reload"], { timeout: 10000 });
       await runProcess("systemctl", ["--user", "enable", SVC_NAME], { timeout: 10000 });
-      push("service", true, qq
-        ? `systemd 服务 ${SVC_NAME} 已注册（QQ ${qq} 快速登录）`
-        : `systemd 服务 ${SVC_NAME} 已注册（未配置 QQ 号，WebUI 模式）`);
-      if (!qq) {
+      push("service", true, svcDesc);
+      if (!linuxQQ && process.platform !== "linux" && !(config.napcatQQ || "").trim()) {
         push("hint", true, "提示：未配置机器人 QQ 号，NapCat 不会生成登录二维码。请在设置「QQ 远程」面板填写机器人 QQ 号（napcatQQ）后重新引导，或在 NapCat WebUI 中添加账号。");
       }
       // 4) 启动（unit 变更时强制重启以应用新参数）
