@@ -91,6 +91,8 @@ export const Config = z.object({
   napcatServiceName: z.string().default("napcat-qq"),
   /** NapCat 安装目录（引导自动安装时的目标；留空 = 自动探测 ~/.dsh/napcat 等）。 */
   napcatInstallDir: z.string().default(""),
+  /** NapCat.Shell 下载地址（默认官方 GitHub Release；网络慢可换镜像或本地 file:// 路径）。 */
+  napcatDownloadUrl: z.string().default(""),
 });
 
 export function apply(ctx, config) {

@@ -155,7 +155,17 @@ node test/onebot-mock.mjs 3001
 - `/exec` 可执行任意命令；`execAllowed: false` 可整体禁用
 - 建议通过 NapCat 使用小号/机器人号，避免主号被风控
 
+- **安装/引导 NapCat 很慢？** 引导需要从 GitHub 下载约 29MB 的 NapCat.Shell，国内网络可能需数分钟——面板会实时显示下载进度。嫌慢可：① 手动下载 `NapCat.Shell.zip` 放到 `~/.dsh/NapCat.Shell.zip`（检测到即跳过下载）；② 在 `~/.dsh/qq-remote.json` 配置 `napcatDownloadUrl` 指向镜像或本地文件。
+
 ## 更新日志
+
+### v0.3.5（2026-08-16）—— 引导下载体验：实时进度 + 镜像支持
+
+- ⚡ **实时下载进度**：引导面板显示「下载中 xMB / 29MB（x%）」，不再干等
+- ⏱️ **下载超时放宽**：5 分钟 → 15 分钟（慢网络友好）
+- 🔗 **可配置下载源**：新增 `napcatDownloadUrl`（默认官方 GitHub Release，可换镜像或本地文件路径）；手动预下载 `~/.dsh/NapCat.Shell.zip` 自动跳过下载
+- 🧪 e2e 21 用例保持全过
+
 
 ### v0.3.4（2026-08-16）—— 修复"一键安装 NapCat"按钮消失
 

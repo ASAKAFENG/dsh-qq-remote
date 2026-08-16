@@ -167,7 +167,8 @@ if [ ! -f "$CFG" ]; then
   "chatMaxChars": 0,
   "chatSessionNames": [],
   "qrcodePath": "",
-  "napcatServiceName": "napcat-qq"
+  "napcatServiceName": "napcat-qq",
+  "napcatDownloadUrl": ""
 }
 CFGEOF
   echo "      已生成 $CFG（⚠️ 请把 allowedUsers 改成你的 QQ 号）"
