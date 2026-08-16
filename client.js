@@ -151,7 +151,7 @@ window.__ModuleLoader__.load({
     // ── Section component ─────────────────────────────────────────────────
     function QqRemoteSection(props) {
       var t = props.t || function (k) { return zh[k] || k; };
-      var state = react.useState({ loading: true, loggedIn: false, ws: false, qr: false, busy: false, reason: "", bsBusy: false, bsSteps: [], msg: "", wl: [], wlInput: "", wlMsg: "", mirrors: [], dlId: "official", dlCustom: "", qq: "", bsRan: false });
+      var state = react.useState({ loading: true, loggedIn: false, ws: false, qr: false, busy: false, reason: "", bsBusy: false, bsSteps: [], msg: "", wl: [], wlInput: "", wlMsg: "", mirrors: [], dlId: "official", dlCustom: "", currentUrl: "", qq: "", bsRan: false });
       var st = state[0];
       var set = state[1];
       var qrTimer = react.useRef(null);
@@ -195,7 +195,7 @@ window.__ModuleLoader__.load({
           try {
             var r = await fetch("/qq-remote/napcat/settings");
             var d = await r.json();
-            if (alive && Array.isArray(d.mirrors)) set(function (prev) { return Object.assign({}, prev, { mirrors: d.mirrors, dlId: d.currentId || "custom", dlCustom: d.currentId === "custom" ? d.current : "", qq: d.napcatQQ || "" }); });
+            if (alive && Array.isArray(d.mirrors)) set(function (prev) { return Object.assign({}, prev, { mirrors: d.mirrors, dlId: d.currentId || "custom", dlCustom: d.currentId === "custom" ? d.current : "", currentUrl: d.current || "", qq: d.napcatQQ || "" }); });
           } catch (e) {}
         };
         loadDl();
@@ -225,19 +225,18 @@ window.__ModuleLoader__.load({
       };
 
       var saveDl = async function () {
-        var url = "";
         var sel = (st.mirrors || []).filter(function (m) { return m.id === st.dlId; })[0];
-        if (sel && st.dlId !== "custom") url = sel.url;
-        else url = st.dlCustom.trim();
-        if (!url) return;
+        var url = (sel && st.dlId !== "custom") ? sel.url : st.dlCustom.trim();
+        // 镜像列表未加载完时回退到服务端当前值（GET 返回的 current）
+        if (!url && st.currentUrl) url = st.currentUrl;
         try {
           var r = await fetch("/qq-remote/napcat/settings", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ url: url, napcatQQ: st.qq.trim() })
+            body: JSON.stringify({ url: url || "", napcatQQ: st.qq.trim() })
           });
           var j = await r.json();
-          set(function (prev) { return Object.assign({}, prev, { msg: j.ok ? t("dlSaved") : ("⚠️ " + (j.error || "")) }); });
+          set(function (prev) { return Object.assign({}, prev, { msg: j.ok ? t("dlSaved") : ("⚠️ " + (j.error || t("dlSaveFail"))) }); });
         } catch (e) {}
       };
 
