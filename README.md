@@ -104,37 +104,28 @@ bash scripts/install.sh
 完整配置项见 `USAGE.md`（含 `reportMode`/`phaseIntervalMs`/`chatSessionNames` 等全部字段）。
 
 
-## 安装疑难（常见问题）
+## 快速上手（安装后）
 
-> 插件功能本身已经过多轮验证；**安装环节**在不同 DSH 环境（源码安装 / npm / pnpm / 市场安装）下可能遇到个别问题，可借助任意 AI 编程助手（Codex / Claude Code 等）按以下提示修复：
+1. **配置白名单**：编辑 `~/.dsh/qq-remote.json`，把 `allowedUsers` 改成你的 QQ 号（默认示例 `[123456789]` 会放行任意消息，务必替换）
+2. **重启 DSH** 让插件加载生效（或热重载）
+3. **准备 NapCat**（QQ 协议桥，插件需要它才能收发消息）：
+   - 已有 NapCat：确认它在运行（DSH 设置页「QQ 远程」面板会显示连接状态）
+   - 没有 NapCat：打开 `http://127.0.0.1:3080/qq-remote/panel` → 点「一键安装/启动 NapCat」→ 自动下载配置启动（下载慢可先切镜像）
+4. **扫码登录**：面板出现二维码后用手机 QQ 扫码授权（2 分钟有效，自动刷新；扫码是 QQ 安全机制，无法跳过）
+5. **验证打通**：用你的 QQ 号给机器人发 `/ping` → 回复 `pong` 即成功；发 `/help` 查看全部命令
+6. **常用命令**：
 
-**Q1: 二维码不显示 / 一直"等待二维码"**
-- 原因：绝大多数是 **NapCat 没在运行**（未安装 / 服务未启动 / 登录态失效）
-- 排查：打开 `http://127.0.0.1:3080/qq-remote/panel`，面板会直接显示原因：
-  - `NapCat 未启动` → 点「一键安装/启动 NapCat」自动安装配置启动（或手动 `systemctl --user start napcat-qq`）
-  - `未找到 WebUI 配置` → 检查 NapCat 是否生成过 `config/webui.json`，或在 `~/.dsh/qq-remote.json` 配置 `qrcodePath`
-  - `二维码已过期` → NapCat 会自动重新生成，稍等
-- 提示：扫码登录是 QQ 安全机制，任何方式都无法跳过；面板二维码 2 分钟有效、自动刷新
+| 想做什么 | 发什么 |
+| --- | --- |
+| 派发任务 | `/ask 帮我整理桌面文件`（或私聊直接发消息） |
+| 查看进度 | `/status` / `/progress` |
+| 截图看屏幕 | `/screenshot` |
+| 执行命令 | `/exec ls -la` |
+| AI 聊天 | `/chat on`（`/chat off` 退出） |
+| 会话管理 | `/sessions` / `/session <标题或id>` / `/title 新名字` |
+| 控制面板 | `/panel`（或设置页「QQ 远程」） |
 
-**Q2: 一键安装/启动 NapCat 很慢**
-- 原因：需要从网络下载约 29MB 的 NapCat.Shell（国内访问 GitHub 较慢）
-- 修复：① 设置页「NapCat 下载源」切换镜像（gh-proxy.com / ghfast.top）；② 手动下载 `NapCat.Shell.zip` 放到 `~/.dsh/NapCat.Shell.zip`（>5MB 自动跳过下载）；③ 面板会实时显示下载进度
-
-**Q3: 引导安装报 `Cannot read properties of undefined (reading 'dirname')`**
-- 原因：v0.3.2 的路径误用 bug
-- 修复：升级到 **v0.3.3+** 已修复
-
-**Q4: 有两个 NapCat 实例互相顶下线（QQ 被挤掉线）**
-- 原因：手动启动了一个 NapCat，又点了引导安装，两个实例抢同一账号
-- 修复：v0.3.3+ 引导前自动检测已有活跃服务并跳过；`systemctl --user status` 确认只保留一个实例
-
-**Q5: 安装后其他插件（如皮肤 UI）失效**
-- 原因：旧版 install.sh 会重写已有 patch 条目，误删其他插件的嵌套配置
-- 修复：升级到 **v0.3.1+**（只做幂等追加，不再改动已有条目）；已损坏的环境运行 `bash scripts/repair.sh` 诊断，或重新安装皮肤插件
-
-**Q6: 市场安装后没有"更新"按钮 / 被识别成"脚本型"**
-- 原因：根目录有 `install.sh` 会被市场误判为脚本型（v0.3.0 及更早）
-- 修复：升级到 **v0.3.1+**（安装脚本已移入 `scripts/` 子目录，市场正确识别为 cordis-plugin，支持版本检测/更新/卸载）
+> 💡 进度会自动推送到 QQ（`/quiet off` 可关）；设置页可增删控制白名单；`uninstall.sh --purge` 可彻底卸载。
 
 ## 截图原理
 
