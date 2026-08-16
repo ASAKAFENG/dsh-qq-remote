@@ -77,7 +77,7 @@ window.__ModuleLoader__.load({
       wlSaved: "✅ 白名单已保存",
       wlSaveFail: "保存失败",
       wlInputPlaceholder: "输入 QQ 号",
-      qrWaiting: "⏳ 等待二维码生成（NapCat 重启后约 30-60 秒）…若持续没有，请在配置里设置 qrcodePath 指向 NapCat 的 qrcode.png"
+      qrWaiting: "⏳ 等待二维码生成…插件会自动从 NapCat WebUI 与常见安装路径获取（重启后约 30-60 秒）。若持续没有：NapCat 可能已登录，或可在配置里设置 qrcodePath 指定路径"
     };
     var en = {
       nav: "QQ Remote",
@@ -95,6 +95,7 @@ window.__ModuleLoader__.load({
       busy: "Restarting NapCat…",
       waiting: "Waiting for QR / auto login (~30-60s)…",
       qrHint: "Scan with QQ mobile (valid ~2 min, auto refresh)",
+      qrWaiting: "⏳ Waiting for QR... plugin auto-fetches from NapCat WebUI & common install paths (~30-60s after restart). If none: NapCat may be logged in, or set qrcodePath in config",
       panel: "Open full panel →",
       failed: "Status fetch failed",
       unavailable: "dsh-qq-remote not registered server-side?",

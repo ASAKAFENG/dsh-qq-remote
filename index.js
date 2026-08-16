@@ -23,6 +23,7 @@ import { fileURLToPath } from "node:url";
 import { defineTool } from "@deepseek-ai/dsh-tools";
 import { createUserMessage } from "@deepseek-ai/dsh-llm";
 import z from "@deepseek-ai/schemastery";
+import { qrToPng } from "./qrgen.js";
 
 /** Cordis 插件名。 */
 export const name = "qq-remote";
@@ -75,6 +76,10 @@ export const Config = z.object({
   chatSessionNames: z.array(z.string()).default([]),
   /** NapCat 登录二维码文件路径（留空自动探测常见安装位置）。 */
   qrcodePath: z.string().default(""),
+  /** NapCat WebUI 端口（二维码自动获取用；默认 6099）。 */
+  webuiPort: z.number().default(6099),
+  /** NapCat WebUI token（留空自动从 webui.json 探测）。 */
+  webuiToken: z.string().default(""),
   /** NapCat 的 systemd 用户服务名（面板"重新登录"用它重启）。 */
   napcatServiceName: z.string().default("napcat-qq"),
 });
@@ -1399,18 +1404,55 @@ export function apply(ctx, config) {
   }
 
   // ── QQ 图形开关面板（Web 页面：状态 + 重新登录 + 二维码） ──────
+  /** NapCat config 目录候选（webui.json 所在处；由 writePath 推导）。 */
+  const WEBUI_JSON_CANDIDATES = () => {
+    const home = os.homedir();
+    const writePaths = [
+      path.join(home, "qqnt", "resources", "app", "napcat"),
+      path.join(home, "QQ", "resources", "app", "napcat"),
+      path.join(home, "NapCat.Shell"),
+      "/opt/NapCat.Shell",
+      path.join(home, "napcat"),
+      "/opt/napcat",
+      path.join(home, ".config", "QQ", "NapCat"),
+      path.join(home, "Library", "Application Support", "QQ", "NapCat"),
+    ];
+    return writePaths.map((d) => path.join(d, "config", "webui.json"));
+  };
+
+  /** 从 systemd 服务 Environment 读取 NAPCAT_WORKDIR（NapCat 自定义数据目录）。 */
+  async function workdirFromSystemd() {
+    try {
+      const svc = config.napcatServiceName || "napcat-qq";
+      const r = await runProcess("systemctl", ["--user", "show", svc, "-p", "Environment"], { timeout: 5000 });
+      const m = String(r.out ?? "").match(/NAPCAT_WORKDIR=([^\s]+)/);
+      if (m && m[1]) return m[1];
+    } catch {}
+    return null;
+  }
+
   /** 登录二维码候选路径（自动探测常见 NapCat 安装位置；可用 qrcodePath 配置覆盖）。 */
   const QR_CANDIDATES = () => {
     const home = os.homedir();
     const list = [
       path.join(home, "napcat", "cache", "qrcode.png"),
       path.join(home, "NapCat", "cache", "qrcode.png"),
+      path.join(home, "NapCat.Shell", "cache", "qrcode.png"),
+      "/opt/NapCat.Shell/cache/qrcode.png",
+      "/opt/napcat/cache/qrcode.png",
+      path.join(home, "qqnt", "resources", "app", "napcat", "cache", "qrcode.png"),
+      path.join(home, "QQ", "resources", "app", "napcat", "cache", "qrcode.png"),
       path.join(home, ".local", "share", "napcat", "cache", "qrcode.png"),
       "/opt/QQ/resources/app/napcat/cache/qrcode.png",
       "/opt/QQNT/resources/app/napcat/cache/qrcode.png",
       path.join(home, ".config", "QQ", "NapCat", "cache", "qrcode.png"),
       path.join(home, ".config", "QQ", "NapCat", "data", "cache", "qrcode.png"),
+      path.join(home, "Library", "Application Support", "QQ", "NapCat", "cache", "qrcode.png"),
     ];
+    // 由 webui.json 的 config 位置反推 writePath/cache/qrcode.png
+    for (const w of WEBUI_JSON_CANDIDATES()) {
+      list.push(path.join(path.dirname(path.dirname(w)), "cache", "qrcode.png"));
+    }
     if (config.qrcodePath) list.unshift(config.qrcodePath);
     return list;
   };
@@ -1419,6 +1461,106 @@ export function apply(ctx, config) {
     for (const p of QR_CANDIDATES()) {
       try {
         if (fs.existsSync(p) && Date.now() - fs.statSync(p).mtimeMs < 10 * 60 * 1000) return p;
+      } catch {}
+    }
+    return null;
+  }
+
+  /** NapCat WebUI 配置（port/token/prefix）：优先用户配置，其次自动探测 webui.json。 */
+  function findWebuiConfig() {
+    const port = config.webuiPort || 6099;
+    if (config.webuiToken) return { port, token: config.webuiToken, prefix: "" };
+    for (const p of WEBUI_JSON_CANDIDATES()) {
+      try {
+        if (!fs.existsSync(p)) continue;
+        const d = JSON.parse(fs.readFileSync(p, "utf8"));
+        if (d && d.token) return { port: d.port || port, token: d.token, prefix: "" };
+      } catch {}
+    }
+    return null;
+  }
+
+  /** 通过 NapCat WebUI API 主动获取二维码 PNG（不依赖文件路径，Docker/自定义目录均可用）。 */
+  let webuiCredentialCache = null;
+  async function webuiCredential() {
+    const wc = findWebuiConfig();
+    if (!wc || !wc.token) return null;
+    // 凭据有效期 1 小时，缓存 50 分钟复用
+    if (webuiCredentialCache && Date.now() - webuiCredentialCache.at < 50 * 60 * 1000) {
+      return webuiCredentialCache;
+    }
+    try {
+      const crypto = await import("node:crypto");
+      const hash = crypto.createHash("sha256").update(wc.token + ".napcat").digest().toString("hex");
+      const r = await fetch(`http://127.0.0.1:${wc.port}${wc.prefix ? "/" + wc.prefix : ""}/api/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ hash }),
+        signal: AbortSignal.timeout(8000),
+      });
+      const j = await r.json().catch(() => null);
+      if (j && j.code === 0 && j.data && typeof j.data.Credential === "string") {
+        webuiCredentialCache = { at: Date.now(), cred: j.data.Credential, port: wc.port, prefix: wc.prefix };
+        return webuiCredentialCache;
+      }
+    } catch {}
+    return null;
+  }
+
+  async function fetchQrcodeViaWebui() {
+    const wc = findWebuiConfig();
+    if (!wc || !wc.token) return null;
+    const cred = await webuiCredential();
+    if (!cred) return null;
+    const base = `http://127.0.0.1:${cred.port}${cred.prefix ? "/" + cred.prefix : ""}/api/QQLogin`;
+    const headers = { "Content-Type": "application/json", Authorization: `Bearer ${cred.cred}` };
+    const getUrl = async () => {
+      try {
+        const r = await fetch(base + "/GetQQLoginQrcode", { method: "POST", headers, body: "{}", signal: AbortSignal.timeout(8000) });
+        const j = await r.json().catch(() => null);
+        if (j && j.code === 0 && j.data && typeof j.data.qrcode === "string" && j.data.qrcode) return j.data.qrcode;
+        if (j && j.code !== 0 && /Unauthorized/i.test(String(j.message ?? ""))) webuiCredentialCache = null; // 凭据过期（NapCat 重启）
+      } catch {}
+      return null;
+    };
+    let url = await getUrl();
+    if (!url) {
+      // 二维码过期/未生成：先刷新再取一次
+      try { await fetch(base + "/RefreshQRcode", { method: "POST", headers, body: "{}", signal: AbortSignal.timeout(5000) }); } catch {}
+      url = await getUrl();
+    }
+    if (!url) return null;
+    try {
+      // 老格式端点（ssl.ptlogin2.qq.com/ptqrshow）直接返回 PNG 图片
+      const img = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0", Accept: "image/*,*/*;q=0.8" }, signal: AbortSignal.timeout(10000) });
+      if (img.ok) {
+        const ct = String(img.headers.get("content-type") || "");
+        const buf = Buffer.from(await img.arrayBuffer());
+        if (/^image\//.test(ct) && buf.length > 16) return buf;
+      }
+    } catch {}
+    // 新格式（txz.qq.com/p 等）：内容是链接，本地生成二维码 PNG（零依赖）
+    return qrToPng(url, { scale: 4, margin: 4 });
+  }
+
+  /** 二维码获取总入口：WebUI API 优先 → 文件探测回退。返回 PNG buffer 或 null。 */
+  async function fetchQrcode() {
+    // 已登录无需二维码（避免无谓的 WebUI 探测与登录限流）
+    if (await qqLoggedIn().catch(() => false)) return null;
+    const buf = await fetchQrcodeViaWebui();
+    if (buf) return buf;
+    const p = findQrcode();
+    if (p) {
+      try {
+        return fs.readFileSync(p);
+      } catch {}
+    }
+    // systemd 服务自定义 NAPCAT_WORKDIR 的最后一次机会
+    const wd = await workdirFromSystemd();
+    if (wd) {
+      const p2 = path.join(wd, "cache", "qrcode.png");
+      try {
+        if (fs.existsSync(p2) && Date.now() - fs.statSync(p2).mtimeMs < 10 * 60 * 1000) return fs.readFileSync(p2);
       } catch {}
     }
     return null;
@@ -1558,12 +1700,13 @@ refresh();setInterval(refresh,5000);
       handler: async (_req, res) => {
         const [loggedIn, qr] = await Promise.all([
           qqLoggedIn().catch(() => false),
-          Promise.resolve(findQrcode()),
+          fetchQrcode().catch(() => null),
         ]);
         json(res, {
           loggedIn,
           wsConnected: Boolean(ws && ws.readyState === WebSocket.OPEN),
           qrAvailable: Boolean(qr),
+          qrReason: qr ? "" : "waiting",
         });
       },
     }), "qq-remote: status");
@@ -1579,14 +1722,14 @@ refresh();setInterval(refresh,5000);
     ctx.effect(() => webServer.register({
       kind: "exact", path: "/qq-remote/qrcode",
       handler: async (_req, res) => {
-        const p = findQrcode();
-        if (!p) {
+        const buf = await fetchQrcode().catch(() => null);
+        if (!buf) {
           res.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
           res.end("no qrcode yet");
           return;
         }
         res.writeHead(200, { "content-type": "image/png", "cache-control": "no-store" });
-        res.end(fs.readFileSync(p));
+        res.end(buf);
       },
     }), "qq-remote: qrcode");
     ctx.effect(() => webServer.register({

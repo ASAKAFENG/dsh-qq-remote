@@ -19,12 +19,14 @@ if [ ! -d "$PROFILE_DIR" ]; then
   exit 1
 fi
 
-# 1. 构建（纯拷贝 index.js/client.js → lib/，无编译依赖）
+# 1. 构建（纯拷贝 index.js/qrgen.js/client.js → lib/，无编译依赖）
 echo "[1/5] 构建插件…"
 mkdir -p "$ROOT/lib"
 cp "$ROOT/index.js" "$ROOT/lib/index.js"
+cp "$ROOT/qrgen.js" "$ROOT/lib/qrgen.js"
 if [ -f "$ROOT/client.js" ]; then cp "$ROOT/client.js" "$ROOT/lib/client.js"; fi
 node --check "$ROOT/lib/index.js"
+node --check "$ROOT/lib/qrgen.js"
 test -f "$ROOT/lib/client.js" || { echo "错误: lib/client.js 缺失（前端 bundle 必需）" >&2; exit 1; }
 
 # 2. 解析依赖实际版本（从当前 DSH 运行时探测，避免猜 npx 缓存/硬编码漂移）
@@ -112,27 +114,13 @@ if existing:
             f.write(new_content)
         os.replace(tmp, path)
     sys.exit(0)
+# 注意：绝不对已有条目做任何"清理/重排"——不同安装方式（NapCat 皮肤、其他插件）的
+# 条目结构各不相同，任何重写都可能破坏它们。只做追加。
 entry = ("\n- insert:\n"
          "    - id: " + pkg_id + "\n"
          "      name: '" + pkg_name + "'\n"
          "      inject: [webServer, tools]\n"
          "      config: {}\n")
-# 清理悬挂子行（历史残留：父块被删的 name:/config: 等）
-cleaned = []
-last_toplevel = False
-for line in content.split("\n"):
-    if not line.strip():
-        cleaned.append(line); continue
-    ind = len(line) - len(line.lstrip())
-    if ind == 0:
-        if line.strip() == "[]":
-            continue  # 顶层 [] 模板：追加条目时无意义，丢弃
-        cleaned.append(line)
-        last_toplevel = bool(re.match(r'^\s*- (insert:|id:)\s', line))
-    elif last_toplevel:
-        cleaned.append(line)
-content = "\n".join(cleaned)
-
 new_content = content.rstrip() + "\n" + entry if content.strip() else entry.lstrip("\n")
 # 原子替换（临时文件 + rename，避免写一半）
 tmp = path + ".tmp"

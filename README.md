@@ -156,6 +156,13 @@ node test/onebot-mock.mjs 3001
 
 ## 更新日志
 
+### v0.2.3（2026-08-16）—— 修复皮肤插件失效 + 二维码自动获取
+
+- 🐛 **修复安装后其他插件（如皮肤 UI）失效**：install.sh 不再对已有 patch 条目做任何清理/重排（旧逻辑会误删其他插件的嵌套配置），只做幂等追加
+- ✨ **二维码自动获取**：面板不再依赖猜测 NapCat 安装路径 —— 自动读取 NapCat WebUI 配置（webui.json）调用 `GetQQLoginQrcode` API 主动获取二维码并本地生成 PNG（内置零依赖 QR 生成器）；Docker / 自定义目录 / 任意安装方式都能显示二维码
+- 🧭 二维码候选路径扩展：NapCat.Shell、Installer、`.config/QQ/NapCat`、macOS 路径、systemd `NAPCAT_WORKDIR` 反推全覆盖
+- 🔧 新增 `webuiPort` / `webuiToken` 配置项（默认自动探测，一般无需配置）
+
 ### v0.2.2（2026-08-16）—— 安装可靠性 + 面板路由 + 白名单
 
 - 🐛 **修复面板路由不注册**：注册条目补 `inject: [webServer, tools]`（cordis.patch.yml / install.sh 模板）；插件代码增加 webServer 未就绪的延迟重试 + 防重复注册 —— 通过 `dsh plugin` 官方安装后 `/qq-remote/*` 路由必定注册
