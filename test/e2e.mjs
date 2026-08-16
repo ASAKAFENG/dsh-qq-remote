@@ -116,12 +116,14 @@ const png = qrToPng("https://txz.qq.com/p?k=test", { scale: 4, margin: 4 });
 check("qrToPng 生成 PNG", png && png.subarray(0, 8).toString("hex") === "89504e470d0a1a0a");
 
 // ── qrReason 诊断分类（四类场景） ─────────────────────────────
-check("无 NapCat → napcat_not_running", classifyQrReason({ ok: false, loggedIn: false, serviceExists: false, webuiAvailable: false, qrFileExists: false, qrFileFresh: false }) === "napcat_not_running");
-check("有服务无 webui → webui_not_found", classifyQrReason({ ok: false, loggedIn: false, serviceExists: true, webuiAvailable: false, qrFileExists: false, qrFileFresh: false }) === "webui_not_found");
-check("旧二维码 → stale_qrcode", classifyQrReason({ ok: false, loggedIn: false, serviceExists: true, webuiAvailable: true, qrFileExists: true, qrFileFresh: false }) === "stale_qrcode");
-check("一切就绪等生成 → waiting", classifyQrReason({ ok: false, loggedIn: false, serviceExists: true, webuiAvailable: true, qrFileExists: false, qrFileFresh: false }) === "waiting");
-check("二维码就绪 → 空 reason", classifyQrReason({ ok: true, loggedIn: false, serviceExists: true, webuiAvailable: true, qrFileExists: false, qrFileFresh: false }) === "");
-check("已登录 → 空 reason", classifyQrReason({ ok: false, loggedIn: true, serviceExists: true, webuiAvailable: false, qrFileExists: false, qrFileFresh: false }) === "");
+check("无 NapCat → napcat_not_running", classifyQrReason({ ok: false, loggedIn: false, serviceActive: false, webuiAvailable: false, qrFileExists: false, qrFileFresh: false }) === "napcat_not_running");
+check("unit 存在但 inactive → napcat_not_running（引导按钮显示）", classifyQrReason({ ok: false, loggedIn: false, serviceActive: false, webuiAvailable: true, qrFileExists: false, qrFileFresh: false }) === "napcat_not_running");
+check("服务运行无 webui → webui_not_found", classifyQrReason({ ok: false, loggedIn: false, serviceActive: true, webuiAvailable: false, qrFileExists: false, qrFileFresh: false }) === "webui_not_found");
+check("旧二维码 → stale_qrcode", classifyQrReason({ ok: false, loggedIn: false, serviceActive: true, webuiAvailable: true, qrFileExists: true, qrFileFresh: false }) === "stale_qrcode");
+check("一切就绪等生成 → waiting", classifyQrReason({ ok: false, loggedIn: false, serviceActive: true, webuiAvailable: true, qrFileExists: false, qrFileFresh: false }) === "waiting");
+check("二维码就绪 → 空 reason", classifyQrReason({ ok: true, loggedIn: false, serviceActive: true, webuiAvailable: true, qrFileExists: false, qrFileFresh: false }) === "");
+check("服务停 + 残留二维码 → napcat_not_running（死码不骗人）", classifyQrReason({ ok: true, loggedIn: false, serviceActive: false, webuiAvailable: true, qrFileExists: true, qrFileFresh: true }) === "napcat_not_running");
+check("已登录 → 空 reason", classifyQrReason({ ok: false, loggedIn: true, serviceActive: false, webuiAvailable: false, qrFileExists: false, qrFileFresh: false }) === "");
 
 // ── NapCat 引导模块可加载 ─────────────────────────────────────
 const nap = createNapcat({ config, log: ctx.logger });

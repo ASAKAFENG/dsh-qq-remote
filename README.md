@@ -157,6 +157,14 @@ node test/onebot-mock.mjs 3001
 
 ## 更新日志
 
+### v0.3.4（2026-08-16）—— 修复"一键安装 NapCat"按钮消失
+
+- 🐛 **按钮消失根因**：NapCat 的 systemd unit 存在但未运行（inactive，如引导注册过服务或残留 unit）时，被误判为"服务存在"→ 二维码原因变成 `webui_not_found`/`waiting` → 引导按钮隐藏
+- 🔧 **修正语义**：`napcat_not_running` 现在严格按"服务**正在运行**"判断（unit 不存在或 inactive 都显示引导按钮）；`/qq-remote/status` 新增 `napcatActive` 字段区分"服务存在"与"正在运行"
+- ❌ relogin 同步：服务 inactive 时也返回真实错误（含修复指引）
+- 🧪 e2e 扩至 20 用例（含"unit 存在但 inactive → 显示引导按钮"场景）
+
+
 ### v0.3.3（2026-08-16）—— 引导修复：dirname bug + 防双实例顶号
 
 - 🐛 **修复引导崩溃**：`Cannot read properties of undefined (reading 'dirname')` —— `os.path.dirname` 误用修正为 `path.dirname`
