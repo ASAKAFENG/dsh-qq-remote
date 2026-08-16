@@ -67,6 +67,7 @@ if [ -d "$ROOT/node_modules" ]; then
 fi
 cp "$ROOT/package.json" "$DEST/package.json"
 cp "$ROOT/cordis.patch.yml" "$DEST/cordis.patch.yml"
+if [ -f "$ROOT/repair.sh" ]; then cp "$ROOT/repair.sh" "$DEST/repair.sh"; fi
 test -f "$DEST/lib/client.js" || { echo "错误: 安装后 lib/client.js 不存在" >&2; exit 1; }
 
 # 4. YAML-aware 注册 loader 条目（处理顶层 [] 模板、scoped 引号、原子替换 + 幂等）
@@ -74,10 +75,13 @@ PATCH="$PROFILE_DIR/cordis.patch.yml"
 echo "[4/5] 注册 loader 条目…"
 if [ ! -f "$PATCH" ]; then echo "[]" > "$PATCH"; fi
 python3 - "$PATCH" "$PKG_ID" "$PKG_NAME" <<'PYEOF'
-import re, sys, os
+import re, sys, os, shutil
 path, pkg_id, pkg_name = sys.argv[1], sys.argv[2], sys.argv[3]
 with open(path, encoding="utf-8") as f:
     content = f.read()
+# 写前备份（任何意外都可手动回滚）
+if content.strip() not in ("", "[]"):
+    shutil.copy2(path, path + ".bak-install")
 # 清理 1：空 `- insert:` 块（无子列表的顶层条目）
 lines = content.split("\n")
 cleaned_lines = []
@@ -106,7 +110,20 @@ stripped = content.strip()
 if stripped in ("", "[]"):
     content = ""
 if existing:
-    # 已存在：也把清理后的内容写回（修复历史残留），然后退出
+    # 已存在：把清理后的内容写回（修复历史残留）；若条目带 disabled（卸载残留）则重新启用
+    content = re.sub(
+        r'^(\s*- id:\s*' + re.escape(pkg_id) + r'\s*$\n)(\s*)disabled:\s*true\s*$',
+        r'\1',
+        content,
+        flags=re.M,
+    )
+    new_content = content
+    if new_content != open(path, encoding="utf-8").read():
+        tmp = path + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            f.write(new_content)
+        os.replace(tmp, path)
+    sys.exit(0)
     new_content = content
     if new_content != open(path, encoding="utf-8").read():
         tmp = path + ".tmp"
@@ -159,3 +176,14 @@ echo "• 重启 DSH 后自动生效（或运行中环境用超级模组 dev_inj
 echo "• 卸载：bash uninstall.sh"
 echo "• 记得配置 ~/.dsh/qq-remote.json 的 allowedUsers 白名单"
 echo "• 需要 OneBot 11 服务端（NapCat 等）监听 ws://127.0.0.1:3001/ws"
+echo
+echo "── 当前 profile 插件条目检查 ──"
+if command -v python3 >/dev/null 2>&1; then
+  if [ -f "$ROOT/repair.sh" ]; then
+    bash "$ROOT/repair.sh" "$PROFILE" | tail -n +2 | head -20
+  else
+    echo "（提示：安装目录下的 repair.sh 可诊断 patch 结构完整性）"
+  fi
+else
+  echo "（提示：python3 不可用，跳过检查；建议手动确认其他插件条目完好）"
+fi
